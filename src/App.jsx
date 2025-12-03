@@ -7,19 +7,19 @@ function App() {
   const currentPhase = useStore((state) => state.currentPhase);
 
   return (
-    <div className="antialiased">
+    <div className="antialiased h-screen w-screen overflow-hidden">
       {currentPhase === 'LOGIN' && <Login />}
       {currentPhase === 'STORY' && <StoryReader />}
 
       {currentPhase === 'BOOTH' && (
-        <div className="h-screen flex items-center justify-center bg-black text-white">
-          <h1 className="text-4xl">CAMERA PHASE (Coming Soon)</h1>
+        <div className="h-full flex items-center justify-center">
+          <h1 className="text-4xl font-bold text-cute-pink">CAMERA PHASE (Coming Soon)</h1>
         </div>
       )}
 
       {currentPhase === 'STUDIO' && (
-        <div className="h-screen flex items-center justify-center bg-black text-white">
-          <h1 className="text-4xl">STUDIO PHASE (Coming Soon)</h1>
+        <div className="h-full flex items-center justify-center">
+          <h1 className="text-4xl font-bold text-cute-mint">STUDIO PHASE (Coming Soon)</h1>
         </div>
       )}
     </div>

@@ -1,28 +1,28 @@
 export const storyDatabase = {
     DEFAULT: {
         theme: {
-            background: '#1a1a1a',
-            text: '#ffffff',
-            accent: '#3b82f6', // blue-500
+            background: '#fff9f9', // cute-bg
+            text: '#4a4a4a', // cute-text
+            accent: '#ffb7b2', // cute-pink
         },
         chapters: [
-            { text: "Welcome, Traveler.", delay: 2000 },
-            { text: "You have arrived at the threshold.", delay: 3000 },
-            { text: "Your journey is just beginning...", delay: 3000 },
-            { text: "Prepare yourself.", delay: 2000 },
+            { text: "Hi there! ✨", delay: 2000 },
+            { text: "You look absolutely lovely today!", delay: 3000 },
+            { text: "Let's make some memories...", delay: 3000 },
+            { text: "Get ready to smile!", delay: 2000 },
         ],
     },
     VIP: {
         theme: {
-            background: '#0f172a', // slate-900
-            text: '#e2e8f0', // slate-200
-            accent: '#8b5cf6', // violet-500
+            background: '#e2f0cb', // cute-purple/yellowish
+            text: '#4a4a4a', // cute-text
+            accent: '#b5ead7', // cute-mint
         },
         chapters: [
-            { text: "Welcome back, Agent.", delay: 2000 },
-            { text: "System access granted. Level 5 clearance confirmed.", delay: 3000 },
-            { text: "The glitch in the matrix has been stabilized.", delay: 3000 },
-            { text: "Proceed to target acquisition.", delay: 2000 },
+            { text: "Welcome back, Superstar! 🌟", delay: 2000 },
+            { text: "The camera loves you!", delay: 3000 },
+            { text: "Time to shine brighter than ever.", delay: 3000 },
+            { text: "Strike a pose!", delay: 2000 },
         ],
     },
 };

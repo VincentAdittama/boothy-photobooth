@@ -30,25 +30,33 @@ const StoryReader = () => {
 
     return (
         <div
-            className="h-screen w-full flex items-center justify-center cursor-pointer relative overflow-hidden"
+            className="h-screen w-full flex items-center justify-center cursor-pointer relative overflow-hidden transition-colors duration-1000"
             onClick={handleNext}
             style={{
                 backgroundColor: story.theme.background,
                 color: story.theme.text
             }}
         >
+            {/* Decorative Background Elements */}
+            <div className="absolute top-10 left-10 w-32 h-32 bg-white/30 rounded-full blur-2xl animate-bounce-slight" />
+            <div className="absolute bottom-10 right-10 w-48 h-48 bg-white/30 rounded-full blur-2xl animate-bounce-slight" style={{ animationDelay: '1s' }} />
+
             <AnimatePresence mode="wait">
                 <motion.div
                     key={chapterIndex}
-                    initial={{ opacity: 0, y: 20, filter: 'blur(10px)' }}
-                    animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
-                    exit={{ opacity: 0, y: -20, filter: 'blur(10px)' }}
-                    transition={{ duration: 0.8, ease: "easeOut" }}
-                    className="max-w-2xl px-8 text-center z-10"
+                    initial={{ opacity: 0, scale: 0.9, rotate: -2 }}
+                    animate={{ opacity: 1, scale: 1, rotate: 0 }}
+                    exit={{ opacity: 0, scale: 1.1, rotate: 2 }}
+                    transition={{ type: "spring", stiffness: 200, damping: 20 }}
+                    className="max-w-3xl px-12 py-16 bg-white/60 backdrop-blur-md rounded-[3rem] shadow-xl border-4 border-white mx-4 text-center z-10 relative"
                 >
+                    {/* Cute Sticker Decoration */}
+                    <div className="absolute -top-6 -right-6 text-4xl animate-bounce-slight">
+                        ✨
+                    </div>
+
                     <p
-                        className="text-3xl md:text-5xl font-light leading-relaxed tracking-wide"
-                        style={{ textShadow: `0 0 20px ${story.theme.accent}40` }}
+                        className="text-3xl md:text-5xl font-bold leading-relaxed tracking-wide text-cute-text"
                     >
                         {currentChapter.text}
                     </p>
@@ -56,12 +64,16 @@ const StoryReader = () => {
             </AnimatePresence>
 
             {/* Progress Indicator */}
-            <div className="absolute bottom-10 left-0 right-0 flex justify-center gap-2">
+            <div className="absolute bottom-12 left-0 right-0 flex justify-center gap-3">
                 {story.chapters.map((_, idx) => (
-                    <div
+                    <motion.div
                         key={idx}
-                        className={`h-1 transition-all duration-500 rounded-full ${idx === chapterIndex ? 'w-8 bg-white' : 'w-2 bg-white/20'
-                            }`}
+                        initial={false}
+                        animate={{
+                            width: idx === chapterIndex ? 32 : 12,
+                            backgroundColor: idx === chapterIndex ? story.theme.accent : '#e5e7eb'
+                        }}
+                        className="h-3 rounded-full shadow-sm"
                     />
                 ))}
             </div>
