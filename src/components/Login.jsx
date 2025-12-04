@@ -4,7 +4,6 @@ import { useStore } from '../store';
 
 const Login = () => {
     const [inputValue, setInputValue] = useState('');
-    const [isUnlocking, setIsUnlocking] = useState(false);
     const { setPhase, setUserType } = useStore();
 
     const handleLogin = (e) => {
@@ -17,81 +16,102 @@ const Login = () => {
             setUserType('DEFAULT');
         }
 
-        setIsUnlocking(true);
-
-        // Simulate unlock animation delay
-        setTimeout(() => {
-            setPhase('STORY');
-        }, 1500);
+        // Direct transition for now, can add animation later if needed
+        setPhase('STORY');
     };
 
+    // Stickers for the footer grid
+    const stickers = Array.from({ length: 16 }, (_, i) => `/stickers/Artboard ${i + 1}.webp`);
+
     return (
-        <div className="flex flex-col items-center justify-center h-full w-full bg-cute-bg relative overflow-hidden">
+        <div className="flex flex-col h-full w-full bg-white overflow-hidden font-black">
+            {/* Header */}
+            <header className="bg-cute-pink py-6 text-center shrink-0">
+                <h1 className="text-4xl md:text-5xl font-black text-white tracking-tighter drop-shadow-lg">
+                    Boothy Photobooth
+                </h1>
+                <p className="text-white/90 text-lg mt-1 font-medium italic">
+                    made with ❤️ by vincent
+                </p>
+            </header>
 
-            {/* Decorative Background Blobs */}
-            <div className="absolute top-[-10%] left-[-10%] w-96 h-96 bg-cute-pink rounded-full mix-blend-multiply filter blur-3xl opacity-70 animate-bounce-slight" />
-            <div className="absolute top-[-10%] right-[-10%] w-96 h-96 bg-cute-mint rounded-full mix-blend-multiply filter blur-3xl opacity-70 animate-bounce-slight" style={{ animationDelay: '1s' }} />
-            <div className="absolute bottom-[-20%] left-[20%] w-96 h-96 bg-cute-purple rounded-full mix-blend-multiply filter blur-3xl opacity-70 animate-bounce-slight" style={{ animationDelay: '2s' }} />
+            {/* Main Content */}
+            <main className="flex-1 flex flex-col items-center justify-center p-4 relative">
 
-            <AnimatePresence>
-                {!isUnlocking ? (
-                    <motion.div
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, scale: 0.8, rotate: -5 }}
-                        className="z-10 bg-white/80 backdrop-blur-sm p-12 rounded-[3rem] shadow-xl border-4 border-white flex flex-col items-center gap-8 max-w-md w-full mx-4"
-                    >
-                        {/* Hero Sticker Placeholder */}
-                        <motion.div
-                            className="w-32 h-32 bg-cute-yellow rounded-full flex items-center justify-center text-4xl mb-2 shadow-inner"
-                            whileHover={{ scale: 1.1, rotate: 10 }}
-                            whileTap={{ scale: 0.9 }}
-                        >
-                            ✨
-                            {/* <img src="/stickers/hero.webp" alt="Welcome" className="w-full h-full object-contain" /> */}
-                        </motion.div>
+                <div className="flex flex-col items-center gap-4 z-10 w-full max-w-md">
+                    <h2 className="text-xl font-bold text-black">Login with anything</h2>
 
-                        <div className="text-center">
-                            <h1 className="text-4xl font-bold text-cute-text mb-2">Welcome!</h1>
-                            <p className="text-cute-text/60 font-medium">Enter your secret code to start</p>
+                    {/* Login Card */}
+                    <div className="bg-cute-pink rounded-[2.5rem] px-8 pt-4 pb-4 w-full h-auto flex flex-col items-center shadow-lg relative overflow-hidden">
+
+                        <div className="w-full flex flex-col items-center gap-2">
+                            <label className="text-white/80 text-md font-medium italic">name</label>
+                            <form onSubmit={handleLogin} className="w-full">
+                                <input
+                                    type="text"
+                                    value={inputValue}
+                                    onChange={(e) => setInputValue(e.target.value)}
+                                    placeholder="enter your nickname"
+                                    className="w-full bg-white rounded-full px-6 py-3 text-center text-gray-600 placeholder:text-gray-300 focus:outline-none shadow-sm text-lg"
+                                    autoFocus
+                                />
+                            </form>
                         </div>
 
-                        <form onSubmit={handleLogin} className="w-full flex flex-col gap-4">
-                            <input
-                                type="text"
-                                value={inputValue}
-                                onChange={(e) => setInputValue(e.target.value)}
-                                placeholder="YOUR CODE"
-                                className="w-full bg-cute-bg border-2 border-transparent focus:border-cute-pink rounded-2xl px-6 py-4 text-center text-xl font-bold text-cute-text placeholder:text-cute-text/30 outline-none transition-all shadow-sm"
-                                autoFocus
-                            />
-                            <motion.button
-                                type="submit"
+                        {/* Hero Sticker Area */}
+                        <div className="flex-1 flex items-end justify-center w-full mt-4 min-h-0">
+                            {/* Placeholder for the large sticker in the design */}
+                            <motion.div
                                 whileHover={{ scale: 1.05 }}
-                                whileTap={{ scale: 0.95 }}
-                                className="w-full bg-cute-pink text-white font-bold text-xl py-4 rounded-2xl shadow-lg hover:shadow-xl hover:bg-red-300 transition-all"
+                                className="max-h-full filter drop-shadow-lg"
                             >
-                                Let's Go!
-                            </motion.button>
-                        </form>
-                    </motion.div>
-                ) : (
-                    <motion.div
-                        initial={{ opacity: 0, scale: 0.5 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        className="z-20 flex flex-col items-center justify-center gap-6"
-                    >
-                        <motion.div
-                            animate={{ rotate: 360 }}
-                            transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                            className="text-6xl"
-                        >
-                            🌸
-                        </motion.div>
-                        <h1 className="text-4xl font-bold text-cute-text">Yay! Access Granted!</h1>
-                    </motion.div>
-                )}
-            </AnimatePresence>
+                                <img src="/assets/Asset 17.webp" alt="Sticker" className="max-h-full w-auto object-contain" />
+                            </motion.div>
+                        </div>
+                    </div>
+                </div>
+
+            </main>
+
+            {/* Footer Sticker Grid */}
+            <footer className="bg-cute-pink py-8 px-4 shrink-0">
+                <div className="max-w-4xl mx-auto grid grid-cols-4 md:grid-cols-8 gap-8 justify-items-center">
+                    {stickers.map((sticker, index) => {
+                        // Generate random values for "organic" feel
+                        // We use a fixed seed based on index to keep it consistent across re-renders if possible,
+                        // but for this simple component, simple math is fine.
+                        // To avoid hydration mismatches in a real SSR app we'd use useEffect, 
+                        // but for this client-side app simple random is okay or we can use index-based pseudo-random.
+                        const rotate = (index % 2 === 0 ? 1 : -1) * ((index * 7) % 15); // Pseudo-random rotation
+                        const duration = 2 + (index % 3) * 0.5; // Pseudo-random duration
+                        const delay = (index % 5) * 0.2;
+
+                        return (
+                            <motion.div
+                                key={index}
+                                initial={{ rotate: rotate, y: 0 }}
+                                animate={{
+                                    y: [-8, 8, -8],
+                                    transition: {
+                                        duration: duration,
+                                        repeat: Infinity,
+                                        ease: "easeInOut",
+                                        delay: delay,
+                                    }
+                                }}
+                                whileHover={{
+                                    scale: 1.2,
+                                    rotate: 0,
+                                    transition: { type: "spring", stiffness: 400, damping: 10 }
+                                }}
+                                className="w-20 h-20 bg-white rounded-full flex items-center justify-center shadow-lg cursor-pointer transform transition-colors hover:bg-white/90"
+                            >
+                                <img src={sticker} alt={`Sticker ${index + 1}`} className="w-12 h-12 object-contain" />
+                            </motion.div>
+                        );
+                    })}
+                </div>
+            </footer>
         </div>
     );
 };
