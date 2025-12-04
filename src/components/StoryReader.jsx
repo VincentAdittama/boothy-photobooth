@@ -10,6 +10,14 @@ const StoryReader = () => {
     const story = storyDatabase[userType] || storyDatabase.DEFAULT;
     const currentChapter = story.chapters[chapterIndex];
 
+    const handleNext = () => {
+        if (chapterIndex < story.chapters.length - 1) {
+            setChapterIndex((prev) => prev + 1);
+        } else {
+            setPhase('BOOTH');
+        }
+    };
+
     useEffect(() => {
         let timeout;
         if (currentChapter && currentChapter.delay) {
@@ -19,14 +27,6 @@ const StoryReader = () => {
         }
         return () => clearTimeout(timeout);
     }, [chapterIndex, currentChapter]);
-
-    const handleNext = () => {
-        if (chapterIndex < story.chapters.length - 1) {
-            setChapterIndex((prev) => prev + 1);
-        } else {
-            setPhase('BOOTH');
-        }
-    };
 
     return (
         <div

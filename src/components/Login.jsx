@@ -4,11 +4,13 @@ import { useStore } from '../store';
 
 const Login = () => {
     const [inputValue, setInputValue] = useState('');
-    const { setPhase, setUserType } = useStore();
+    const { setPhase, setUserType, setNickname } = useStore();
 
     const handleLogin = (e) => {
         e.preventDefault();
         const input = inputValue.trim().toUpperCase();
+
+        setNickname(input || 'GUEST');
 
         if (input === 'VINCENT' || input === 'VIP') {
             setUserType('VIP');

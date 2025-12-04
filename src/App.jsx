@@ -1,6 +1,7 @@
 import React from 'react';
 import { useStore } from './store';
 import Login from './components/Login';
+import Booth from './components/Booth';
 import StoryReader from './components/StoryReader';
 
 function App() {
@@ -10,12 +11,7 @@ function App() {
     <div className="antialiased h-screen w-screen overflow-hidden">
       {currentPhase === 'LOGIN' && <Login />}
       {currentPhase === 'STORY' && <StoryReader />}
-
-      {currentPhase === 'BOOTH' && (
-        <div className="h-full flex items-center justify-center">
-          <h1 className="text-4xl font-bold text-cute-pink">CAMERA PHASE (Coming Soon)</h1>
-        </div>
-      )}
+      {currentPhase === 'BOOTH' && <Booth />}
 
       {currentPhase === 'STUDIO' && (
         <div className="h-full flex items-center justify-center">
