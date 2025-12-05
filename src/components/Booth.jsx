@@ -12,6 +12,7 @@ const Booth = () => {
     const [count, setCount] = useState(3);
     const [isFlashing, setIsFlashing] = useState(false);
     const [isUploading, setIsUploading] = useState(false);
+    const [isMirrored, setIsMirrored] = useState(true);
 
     const handleStartCapture = () => {
         setIsCountingDown(true);
@@ -34,7 +35,26 @@ const Booth = () => {
         setIsFlashing(true);
         setTimeout(() => setIsFlashing(false), 150);
 
-        const imageSrc = webcamRef.current.getScreenshot();
+        let imageSrc = webcamRef.current.getScreenshot();
+
+        if (isMirrored && imageSrc) {
+            // Manually flip the image if mirrored
+            imageSrc = await new Promise((resolve) => {
+                const img = new Image();
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    canvas.width = img.width;
+                    canvas.height = img.height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.translate(canvas.width, 0);
+                    ctx.scale(-1, 1);
+                    ctx.drawImage(img, 0, 0);
+                    resolve(canvas.toDataURL('image/png'));
+                };
+                img.src = imageSrc;
+            });
+        }
+
         setCapturedImage(imageSrc);
 
         // Convert base64 to blob for upload
@@ -59,7 +79,7 @@ const Booth = () => {
             setPhase('STUDIO');
         }
 
-    }, [webcamRef, setCapturedImage, setPhase, nickname]);
+    }, [webcamRef, setCapturedImage, setPhase, nickname, isMirrored]);
 
     return (
         <div className="h-full w-full bg-black relative overflow-hidden flex flex-col items-center justify-center">
@@ -70,6 +90,7 @@ const Booth = () => {
                     ref={webcamRef}
                     screenshotFormat="image/png"
                     className="w-full h-full object-cover"
+                    mirrored={isMirrored}
                     videoConstraints={{
                         facingMode: "user",
                         width: 1280,
@@ -113,14 +134,32 @@ const Booth = () => {
             {/* Controls */}
             <div className="absolute bottom-8 left-0 right-0 flex justify-center items-center gap-8 z-10">
                 {!isCountingDown && !isUploading && (
-                    <motion.button
-                        whileHover={{ scale: 1.1 }}
-                        whileTap={{ scale: 0.9 }}
-                        onClick={handleStartCapture}
-                        className="w-20 h-20 bg-white rounded-full border-4 border-gray-200 shadow-xl flex items-center justify-center group"
-                    >
-                        <div className="w-16 h-16 bg-cute-pink rounded-full group-hover:bg-pink-400 transition-colors" />
-                    </motion.button>
+                    <>
+                        <motion.button
+                            whileHover={{ scale: 1.1 }}
+                            whileTap={{ scale: 0.9 }}
+                            onClick={() => setIsMirrored(!isMirrored)}
+                            className="w-16 h-16 bg-white/20 backdrop-blur-md rounded-full border-2 border-white/50 flex items-center justify-center group"
+                            title={isMirrored ? "Turn Mirroring Off" : "Turn Mirroring On"}
+                        >
+                            {/* Simple icon for mirror toggle */}
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-8 h-8 text-white">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 21 3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5" />
+                            </svg>
+                        </motion.button>
+
+                        <motion.button
+                            whileHover={{ scale: 1.1 }}
+                            whileTap={{ scale: 0.9 }}
+                            onClick={handleStartCapture}
+                            className="w-20 h-20 bg-white rounded-full border-4 border-gray-200 shadow-xl flex items-center justify-center group"
+                        >
+                            <div className="w-16 h-16 bg-cute-pink rounded-full group-hover:bg-pink-400 transition-colors" />
+                        </motion.button>
+
+                        {/* Spacer to balance the layout */}
+                        <div className="w-16 h-16" />
+                    </>
                 )}
             </div>
 

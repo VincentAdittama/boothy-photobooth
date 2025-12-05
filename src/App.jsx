@@ -3,6 +3,7 @@ import { useStore } from './store';
 import Login from './components/Login';
 import Booth from './components/Booth';
 import StoryReader from './components/StoryReader';
+import Studio from './components/Studio';
 
 function App() {
   const currentPhase = useStore((state) => state.currentPhase);
@@ -12,12 +13,7 @@ function App() {
       {currentPhase === 'LOGIN' && <Login />}
       {currentPhase === 'STORY' && <StoryReader />}
       {currentPhase === 'BOOTH' && <Booth />}
-
-      {currentPhase === 'STUDIO' && (
-        <div className="h-full flex items-center justify-center">
-          <h1 className="text-4xl font-bold text-cute-mint">STUDIO PHASE (Coming Soon)</h1>
-        </div>
-      )}
+      {currentPhase === 'STUDIO' && <Studio />}
     </div>
   );
 }

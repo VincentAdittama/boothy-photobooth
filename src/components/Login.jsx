@@ -18,8 +18,12 @@ const Login = () => {
             setUserType('DEFAULT');
         }
 
-        // Direct transition for now, can add animation later if needed
-        setPhase('STORY');
+        // Easter Egg: Skip story if nickname is 'SKIP'
+        if (input === 'SKIP') {
+            setPhase('BOOTH');
+        } else {
+            setPhase('STORY');
+        }
     };
 
     // Stickers for the footer grid
