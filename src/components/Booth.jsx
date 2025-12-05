@@ -6,13 +6,12 @@ import { uploadPhoto } from '../lib/supabase';
 
 const Booth = () => {
     const webcamRef = useRef(null);
-    const { setPhase, setCapturedImage, nickname, capturedImage } = useStore();
+    const { setPhase, setCapturedImage, nickname, capturedImage, isMirrored, setIsMirrored } = useStore();
 
     const [isCountingDown, setIsCountingDown] = useState(false);
     const [count, setCount] = useState(3);
     const [isFlashing, setIsFlashing] = useState(false);
     const [isUploading, setIsUploading] = useState(false);
-    const [isMirrored, setIsMirrored] = useState(true);
 
     const [isTransitioning, setIsTransitioning] = useState(false);
 
@@ -39,23 +38,8 @@ const Booth = () => {
 
         let imageSrc = webcamRef.current.getScreenshot();
 
-        if (isMirrored && imageSrc) {
-            // Manually flip the image if mirrored
-            imageSrc = await new Promise((resolve) => {
-                const img = new Image();
-                img.onload = () => {
-                    const canvas = document.createElement('canvas');
-                    canvas.width = img.width;
-                    canvas.height = img.height;
-                    const ctx = canvas.getContext('2d');
-                    ctx.translate(canvas.width, 0);
-                    ctx.scale(-1, 1);
-                    ctx.drawImage(img, 0, 0);
-                    resolve(canvas.toDataURL('image/png'));
-                };
-                img.src = imageSrc;
-            });
-        }
+        // REMOVED: Manual flip "burn-in". We now keep the raw image and flip visually.
+        // if (isMirrored && imageSrc) { ... }
 
         setCapturedImage(imageSrc);
 
@@ -63,16 +47,38 @@ const Booth = () => {
         setIsTransitioning(true);
 
         // Convert base64 to blob for upload
+        // If flipped, we need to flip it here for the upload ONLY
         try {
             setIsUploading(true);
-            const res = await fetch(imageSrc);
-            const blob = await res.blob();
+            let uploadBlob;
+
+            if (isMirrored) {
+                const flippedDataUrl = await new Promise((resolve) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        const canvas = document.createElement('canvas');
+                        canvas.width = img.width;
+                        canvas.height = img.height;
+                        const ctx = canvas.getContext('2d');
+                        ctx.translate(canvas.width, 0);
+                        ctx.scale(-1, 1);
+                        ctx.drawImage(img, 0, 0);
+                        resolve(canvas.toDataURL('image/png'));
+                    };
+                    img.src = imageSrc;
+                });
+                const res = await fetch(flippedDataUrl);
+                uploadBlob = await res.blob();
+            } else {
+                const res = await fetch(imageSrc);
+                uploadBlob = await res.blob();
+            }
 
             // Upload to Supabase "fire and forget" style or await it?
             // Let's await it to ensure it's saved before moving on, 
             // but we could also do it in background.
             // Given "no safety", let's just try to upload.
-            await uploadPhoto(nickname, blob);
+            await uploadPhoto(nickname, uploadBlob);
 
             setIsUploading(false);
 

@@ -6,7 +6,7 @@ import { motion } from 'framer-motion';
 
 // URLImage component for loading images on canvas
 // Now simplified: it doesn't handle Transformer internally
-const URLImage = ({ src, isBackground = false, onSelect, onChange, shapeRef, ...props }) => {
+const URLImage = ({ src, isBackground = false, isMirrored = false, onSelect, onChange, shapeRef, ...props }) => {
     const [image] = useImage(src, 'anonymous');
 
     // If it's the background, we want it to fill the stage or fit nicely
@@ -45,6 +45,9 @@ const URLImage = ({ src, isBackground = false, onSelect, onChange, shapeRef, ...
             ref={shapeRef}
             crop={crop}
             {...props}
+            {...props}
+            scaleX={isBackground && isMirrored ? -1 : 1}
+            x={isBackground && isMirrored ? props.width : props.x} // If flipped, move x to width to compensate for negative scale
             draggable={!isBackground}
             onClick={onSelect}
             onTap={onSelect}
@@ -84,7 +87,7 @@ const URLImage = ({ src, isBackground = false, onSelect, onChange, shapeRef, ...
 };
 
 const Studio = () => {
-    const { capturedImage, setPhase } = useStore();
+    const { capturedImage, setPhase, isMirrored } = useStore();
     const stageRef = useRef(null);
     const [stickers, setStickers] = useState([]);
     const [selectedId, selectShape] = useState(null);
@@ -220,6 +223,7 @@ const Studio = () => {
                                 <URLImage
                                     src={capturedImage}
                                     isBackground={true}
+                                    isMirrored={isMirrored}
                                     x={0}
                                     y={0}
                                     width={stageSize.width}
