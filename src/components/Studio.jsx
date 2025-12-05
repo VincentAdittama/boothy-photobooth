@@ -196,7 +196,17 @@ const Studio = () => {
                 onDrop={handleDrop}
                 onDragOver={handleDragOver}
             >
-                <div className="shadow-2xl border-4 border-white bg-white">
+                <motion.div
+                    initial={{ scale: 0.2, rotate: -5, x: 0, opacity: 1 }}
+                    animate={{ scale: 1, rotate: 0, x: 0, opacity: 1 }}
+                    transition={{
+                        type: "spring",
+                        stiffness: 260,
+                        damping: 20,
+                        delay: 0.1
+                    }}
+                    className="shadow-2xl border-4 border-white bg-white"
+                >
                     <Stage
                         width={stageSize.width}
                         height={stageSize.height}
@@ -247,7 +257,7 @@ const Studio = () => {
                             />
                         </Layer>
                     </Stage>
-                </div>
+                </motion.div>
             </div>
 
             {/* Sidebar / Controls */}

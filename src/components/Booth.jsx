@@ -6,13 +6,15 @@ import { uploadPhoto } from '../lib/supabase';
 
 const Booth = () => {
     const webcamRef = useRef(null);
-    const { setPhase, setCapturedImage, nickname } = useStore();
+    const { setPhase, setCapturedImage, nickname, capturedImage } = useStore();
 
     const [isCountingDown, setIsCountingDown] = useState(false);
     const [count, setCount] = useState(3);
     const [isFlashing, setIsFlashing] = useState(false);
     const [isUploading, setIsUploading] = useState(false);
     const [isMirrored, setIsMirrored] = useState(true);
+
+    const [isTransitioning, setIsTransitioning] = useState(false);
 
     const handleStartCapture = () => {
         setIsCountingDown(true);
@@ -57,6 +59,9 @@ const Booth = () => {
 
         setCapturedImage(imageSrc);
 
+        // Start transition animation
+        setIsTransitioning(true);
+
         // Convert base64 to blob for upload
         try {
             setIsUploading(true);
@@ -70,13 +75,20 @@ const Booth = () => {
             await uploadPhoto(nickname, blob);
 
             setIsUploading(false);
-            setPhase('STUDIO');
+
+            // Wait a bit for the animation to be "felt" before switching
+            setTimeout(() => {
+                setPhase('STUDIO');
+            }, 1200);
+
         } catch (error) {
             console.error("Upload failed", error);
             setIsUploading(false);
             // Still move to studio even if upload fails? 
             // Maybe show error? For now, let's just move on so user isn't stuck.
-            setPhase('STUDIO');
+            setTimeout(() => {
+                setPhase('STUDIO');
+            }, 1200);
         }
 
     }, [webcamRef, setCapturedImage, setPhase, nickname, isMirrored]);
@@ -121,7 +133,7 @@ const Booth = () => {
                 )}
 
                 {/* Uploading Overlay */}
-                {isUploading && (
+                {isUploading && !isTransitioning && (
                     <div className="absolute inset-0 bg-black/50 z-40 flex items-center justify-center backdrop-blur-sm">
                         <div className="flex flex-col items-center gap-4">
                             <div className="w-12 h-12 border-4 border-white border-t-transparent rounded-full animate-spin" />
@@ -131,9 +143,40 @@ const Booth = () => {
                 )}
             </div>
 
+            {/* Transition Overlay - The "Flying Photo" */}
+            <AnimatePresence>
+                {isTransitioning && (
+                    <div className="absolute inset-0 z-50 flex items-center justify-center pointer-events-none">
+                        <motion.div
+                            initial={{ scale: 1, rotate: 0, opacity: 1 }}
+                            animate={{
+                                scale: [1, 1.1, 0.2],
+                                rotate: [0, 10, -10, -5],
+                                x: [0, 60, -60, -160],
+                                y: [0, -80, 20, 0],
+                                opacity: 1,
+                                boxShadow: "0px 20px 50px rgba(0,0,0,0.5)"
+                            }}
+                            transition={{
+                                duration: 1.2,
+                                ease: "easeInOut",
+                                times: [0, 0.4, 0.7, 1]
+                            }}
+                            className="relative w-full h-full max-w-4xl max-h-[80vh] rounded-3xl overflow-hidden border-4 border-white bg-black"
+                        >
+                            <img
+                                src={capturedImage}
+                                alt="Captured"
+                                className={`w-full h-full object-cover ${isMirrored ? '-scale-x-100' : ''}`}
+                            />
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
+
             {/* Controls */}
             <div className="absolute bottom-8 left-0 right-0 flex justify-center items-center gap-8 z-10">
-                {!isCountingDown && !isUploading && (
+                {!isCountingDown && !isUploading && !isTransitioning && (
                     <>
                         <motion.button
                             whileHover={{ scale: 1.1 }}
