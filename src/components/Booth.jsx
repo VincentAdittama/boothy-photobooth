@@ -6,11 +6,10 @@ import { uploadPhoto } from '../lib/supabase';
 
 const Booth = () => {
     const webcamRef = useRef(null);
-    const { setPhase, setCapturedImage, nickname, capturedImage, isMirrored, setIsMirrored, setCapturedImageIsMirrored } = useStore();
+    const { setPhase, setCapturedImage, nickname, capturedImage, isMirrored, setIsMirrored, setCapturedImageIsMirrored, setIsFlashing, isFlashEnabled, setIsFlashEnabled } = useStore();
 
     const [isCountingDown, setIsCountingDown] = useState(false);
     const [count, setCount] = useState(3);
-    const [isFlashing, setIsFlashing] = useState(false);
     const [isUploading, setIsUploading] = useState(false);
 
     const [isTransitioning, setIsTransitioning] = useState(false);
@@ -33,53 +32,63 @@ const Booth = () => {
 
     const capture = async () => {
         setIsCountingDown(false);
-        setIsFlashing(true);
-        setTimeout(() => setIsFlashing(false), 150);
 
-        const imageSrc = webcamRef.current.getScreenshot();
-        let finalImageSrc = imageSrc;
+        // Start flash if enabled
+        if (isFlashEnabled) {
+            setIsFlashing(true);
 
-        // finalImageSrc will be the exact screenshot returned by react-webcam.
-        // We enforce WYSIWYG: captured image will match the preview (mirrored or not).
-        if (imageSrc) {
-            finalImageSrc = imageSrc;
-
-            // We enforce WYSIWYG: exported images match the preview. So no un-flipping here.
+            // End flash after 250ms total (50ms fade in + 200ms full flash)
+            setTimeout(() => {
+                setIsFlashing(false);
+            }, 250);
         }
 
-        setCapturedImage(finalImageSrc);
-        // Track whether the stored captured image is mirrored (matches preview)
-        setCapturedImageIsMirrored(Boolean(isMirrored));
+        // Snap at peak flash (after 50ms fade in)
+        setTimeout(async () => {
+            const imageSrc = webcamRef.current.getScreenshot();
+            let finalImageSrc = imageSrc;
 
-        // Start transition animation
-        setIsTransitioning(true);
+            // finalImageSrc will be the exact screenshot returned by react-webcam.
+            // We enforce WYSIWYG: captured image will match the preview (mirrored or not).
+            if (imageSrc) {
+                finalImageSrc = imageSrc;
 
-        // Upload to Supabase
-        try {
-            setIsUploading(true);
+                // We enforce WYSIWYG: exported images match the preview. So no un-flipping here.
+            }
 
-            // Convert the final (potentially flipped) base64 to blob for upload
-            const res = await fetch(finalImageSrc);
-            const uploadBlob = await res.blob();
+            setCapturedImage(finalImageSrc);
+            // Track whether the stored captured image is mirrored (matches preview)
+            setCapturedImageIsMirrored(Boolean(isMirrored));
 
-            await uploadPhoto(nickname, uploadBlob);
+            // Start transition animation
+            setIsTransitioning(true);
 
-            setIsUploading(false);
+            // Upload to Supabase
+            try {
+                setIsUploading(true);
 
-            // Wait a bit for the animation to be "felt" before switching
-            setTimeout(() => {
-                setPhase('STUDIO');
-            }, 1200);
+                // Convert the final (potentially flipped) base64 to blob for upload
+                const res = await fetch(finalImageSrc);
+                const uploadBlob = await res.blob();
 
-        } catch (error) {
-            console.error("Upload failed", error);
-            setIsUploading(false);
-            // Still move to studio even if upload fails
-            setTimeout(() => {
-                setPhase('STUDIO');
-            }, 1200);
-        }
+                await uploadPhoto(nickname, uploadBlob);
 
+                setIsUploading(false);
+
+                // Wait a bit for the animation to be "felt" before switching
+                setTimeout(() => {
+                    setPhase('STUDIO');
+                }, 1200);
+
+            } catch (error) {
+                console.error("Upload failed", error);
+                setIsUploading(false);
+                // Still move to studio even if upload fails
+                setTimeout(() => {
+                    setPhase('STUDIO');
+                }, 1200);
+            }
+        }, 50);
     };
 
     return (
@@ -115,11 +124,6 @@ const Booth = () => {
                         </Motion.div>
                     )}
                 </AnimatePresence>
-
-                {/* Flash Overlay */}
-                {isFlashing && (
-                    <div className="absolute inset-0 bg-white z-30 animate-flash" />
-                )}
 
                 {/* Uploading Overlay */}
                 {isUploading && !isTransitioning && (
@@ -171,12 +175,25 @@ const Booth = () => {
                             whileHover={{ scale: 1.1 }}
                             whileTap={{ scale: 0.9 }}
                             onClick={() => setIsMirrored(!isMirrored)}
-                            className="w-16 h-16 bg-white/20 backdrop-blur-md rounded-full border-2 border-white/50 flex items-center justify-center group"
+                            className={`w-16 h-16 backdrop-blur-md rounded-full border-2 border-white/50 flex items-center justify-center group ${isMirrored ? 'bg-blue-400/20' : 'bg-white/20'}`}
                             title={isMirrored ? "Turn Mirroring Off" : "Turn Mirroring On"}
                         >
                             {/* Simple icon for mirror toggle */}
-                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-8 h-8 text-white">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={`w-8 h-8 ${isMirrored ? 'text-blue-400' : 'text-white'}`}>
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 21 3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5" />
+                            </svg>
+                        </Motion.button>
+
+                        <Motion.button
+                            whileHover={{ scale: 1.1 }}
+                            whileTap={{ scale: 0.9 }}
+                            onClick={() => setIsFlashEnabled(!isFlashEnabled)}
+                            className={`w-16 h-16 backdrop-blur-md rounded-full border-2 border-white/50 flex items-center justify-center group ${isFlashEnabled ? 'bg-yellow-400/20' : 'bg-white/20'}`}
+                            title={isFlashEnabled ? "Turn Flash Off" : "Turn Flash On"}
+                        >
+                            {/* Lightning bolt icon for flash */}
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={`w-8 h-8 ${isFlashEnabled ? 'text-yellow-400' : 'text-white'}`}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" />
                             </svg>
                         </Motion.button>
 
