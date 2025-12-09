@@ -67,12 +67,12 @@ const Login = () => {
                         {/* Hero Sticker Area */}
                         <div className="flex-1 flex items-end justify-center w-full mt-4 min-h-0">
                             {/* Placeholder for the large sticker in the design */}
-                            <motion.div
+                            <Motion.div
                                 whileHover={{ scale: 1.05 }}
                                 className="max-h-full filter drop-shadow-lg"
                             >
                                 <img src="/assets/Asset 17.webp" alt="Sticker" className="max-h-full w-auto object-contain" />
-                            </motion.div>
+                            </Motion.div>
                         </div>
                     </div>
                 </div>
@@ -93,7 +93,7 @@ const Login = () => {
                         const delay = (index % 5) * 0.2;
 
                         return (
-                            <motion.div
+                            <Motion.div
                                 key={index}
                                 initial={{ rotate: rotate, y: 0 }}
                                 animate={{
@@ -113,7 +113,7 @@ const Login = () => {
                                 className="w-20 h-20 bg-white rounded-full flex items-center justify-center shadow-lg cursor-pointer transform transition-colors hover:bg-white/90"
                             >
                                 <img src={sticker} alt={`Sticker ${index + 1}`} className="w-12 h-12 object-contain" />
-                            </motion.div>
+                            </Motion.div>
                         );
                     })}
                 </div>
