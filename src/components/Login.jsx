@@ -1,10 +1,64 @@
-import React, { useState } from 'react';
-import { motion as Motion } from 'framer-motion';
+import React, { useState, useEffect, useRef } from 'react';
+import { motion as Motion, useMotionValue, useSpring } from 'framer-motion';
 import { useStore } from '../store';
 
 const Login = () => {
     const [inputValue, setInputValue] = useState('');
     const { setPhase, setUserType, setNickname } = useStore();
+    const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
+    const [velocity, setVelocity] = useState({ x: 0, y: 0 });
+    const [isHovering, setIsHovering] = useState(false);
+    const mouseRef = useRef({ x: 0, y: 0 });
+    const velRef = useRef({ x: 0, y: 0 });
+    const rafRef = useRef(null);
+
+    // motion values for smooth rotation
+    const rotateMV = useMotionValue(0);
+    const rotateSpring = useSpring(rotateMV, { stiffness: 320, damping: 30 });
+
+    useEffect(() => {
+        // Smooth pointer updates: write raw mouse values to refs in mousemove then
+        // read from refs in a RAF loop to update React state at consistent frames.
+        let prevPos = { x: 0, y: 0 };
+        let prevTime = Date.now();
+        let running = true;
+
+        const handleMouseMove = (e) => {
+            const currentTime = Date.now();
+            const dt = Math.max(currentTime - prevTime, 1);
+            const currentPos = { x: e.clientX, y: e.clientY };
+            const velX = (currentPos.x - prevPos.x) / dt * 1000;
+            const velY = (currentPos.y - prevPos.y) / dt * 1000;
+
+            mouseRef.current = currentPos;
+            velRef.current = { x: velX, y: velY };
+            prevPos = currentPos;
+            prevTime = currentTime;
+        };
+
+        const loop = () => {
+            // snap local state to ref values each rAF for consistent animation updates
+            setMousePos({ ...mouseRef.current });
+            setVelocity({ ...velRef.current });
+            if (running) rafRef.current = requestAnimationFrame(loop);
+        };
+
+        rafRef.current = requestAnimationFrame(loop);
+        window.addEventListener('mousemove', handleMouseMove);
+
+        return () => {
+            running = false;
+            window.removeEventListener('mousemove', handleMouseMove);
+            if (rafRef.current) cancelAnimationFrame(rafRef.current);
+        };
+    }, []);
+
+    // Update rotate MV to reflect current velocity; this reduces jitter by
+    // animating with useSpring for the stick.
+    useEffect(() => {
+        const tiltDeg = Math.min(Math.max((velocity.x || 0) * 0.02 - (velocity.y || 0) * 0.004, -14), 14);
+        rotateMV.set(tiltDeg);
+    }, [velocity.x, velocity.y]);
 
     const handleLogin = (e) => {
         e.preventDefault();
@@ -69,10 +123,76 @@ const Login = () => {
                             {/* Placeholder for the large sticker in the design */}
                             <Motion.div
                                 whileHover={{ scale: 1.05 }}
-                                className="max-h-full filter drop-shadow-lg"
+                                onMouseEnter={(e) => {
+                                    // set current pointer immediately to prevent jump
+                                    const next = { x: e.clientX, y: e.clientY };
+                                    mouseRef.current = next;
+                                    setMousePos(next);
+                                    setVelocity({ x: 0, y: 0 });
+                                    setIsHovering(true);
+                                }}
+                                onMouseLeave={() => setIsHovering(false)}
+                                onClick={handleLogin}
+                                className="max-h-full filter drop-shadow-lg cursor-pointer"
                             >
                                 <img src="/assets/Asset 17.webp" alt="Sticker" className="max-h-full w-auto object-contain" />
                             </Motion.div>
+
+                            {isHovering && (() => {
+                                const BOARD_W = 180;
+                                const BOARD_H = 46;
+                                const STICK_LEN = 54;
+                                const clamp = (v, a, b) => Math.min(Math.max(v, a), b);
+                                const vw = typeof window !== 'undefined' ? window.innerWidth : 1024;
+                                const vh = typeof window !== 'undefined' ? window.innerHeight : 768;
+                                const targetCenterX = clamp(mousePos.x, BOARD_W / 2 + 12, vw - BOARD_W / 2 - 12);
+                                const targetCenterY = clamp(mousePos.y - STICK_LEN - BOARD_H / 2, 12, vh - BOARD_H - 12);
+                                const targetLeft = targetCenterX - BOARD_W / 2;
+                                const targetTop = targetCenterY - BOARD_H / 2;
+                                const tiltDeg = clamp((velocity.x || 0) * 0.02 - (velocity.y || 0) * 0.004, -14, 14);
+
+                                return (
+                                    <Motion.div
+                                        // initial position now follows the pointer so it doesn't jump from 0,0
+                                        initial={{ opacity: 0, scale: 0.85, x: targetLeft, y: targetTop }}
+                                        animate={{ opacity: 1, scale: 1, x: targetLeft, y: targetTop }}
+                                        exit={{ opacity: 0, scale: 0.85 }}
+                                        transition={{ type: 'spring', stiffness: 220, damping: 28 }}
+                                        style={{ position: 'fixed', left: 0, top: 0, pointerEvents: 'none', zIndex: 1000 }}
+                                    >
+                                        <Motion.div
+                                            style={{
+                                                width: BOARD_W,
+                                                // auto height
+                                                rotate: rotateSpring,
+                                                transformOrigin: '50% 100px', // Pivot approx where the hand holds it (below the board)
+                                                filter: 'drop-shadow(0px 10px 10px rgba(0,0,0,0.2))'
+                                            }}
+                                            className="relative flex flex-col items-center pointer-events-none"
+                                        >
+                                            <div className="relative w-full text-center bg-amber-700 border-4 border-amber-900 rounded-lg px-4 py-2 text-white font-black text-sm shadow-inner transform -translate-y-1">
+                                                <div className="absolute inset-0 border-2 border-[#ffffff20] rounded-lg pointer-events-none"></div>
+                                                ENTER BOOTHY
+                                                {/* little nails */}
+                                                <span className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-amber-950 shadow-sm border border-amber-800" />
+                                                <span className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-amber-950 shadow-sm border border-amber-800" />
+                                            </div>
+
+                                            {/* The Stick */}
+                                            <div
+                                                style={{
+                                                    width: 14,
+                                                    height: STICK_LEN + 20,
+                                                    background: 'linear-gradient(90deg, #3E2723 0%, #5D4037 45%, #795548 50%, #5D4037 55%, #3E2723 100%)',
+                                                    borderRadius: '0 0 10px 10px',
+                                                    marginTop: -5,
+                                                    zIndex: -1
+                                                }}
+                                            />
+                                        </Motion.div>
+                                    </Motion.div>
+                                );
+                            })()}
                         </div>
                     </div>
                 </div>
