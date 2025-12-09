@@ -9,12 +9,20 @@ import Studio from './components/Studio';
 function App() {
   const currentPhase = useStore((state) => state.currentPhase);
   const isFlashing = useStore((state) => state.isFlashing);
+  const isCameraPreloading = useStore((state) => state.isCameraPreloading);
 
   return (
     <div className="antialiased h-screen w-screen overflow-hidden">
       {currentPhase === 'LOGIN' && <Login />}
       {currentPhase === 'STORY' && <StoryReader />}
-      {currentPhase === 'BOOTH' && <Booth />}
+
+      {/* Booth: Render if active phase OR if preloading during story (hidden) */}
+      {(currentPhase === 'BOOTH' || (currentPhase === 'STORY' && isCameraPreloading)) && (
+        <div className={currentPhase === 'STORY' ? "fixed inset-0 opacity-0 pointer-events-none -z-50" : "h-full w-full"}>
+          <Booth />
+        </div>
+      )}
+
       {currentPhase === 'STUDIO' && <Studio />}
 
       {/* Full Screen Flash Overlay */}

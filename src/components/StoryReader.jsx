@@ -4,79 +4,246 @@ import { useStore } from '../store';
 import { storyDatabase } from '../data/stories';
 
 const StoryReader = () => {
-    const { userType, setPhase } = useStore();
+    const { userType, setPhase, nickname, setIsCameraPreloading } = useStore();
     const [chapterIndex, setChapterIndex] = useState(0);
 
     const story = storyDatabase[userType] || storyDatabase.DEFAULT;
     const currentChapter = story.chapters[chapterIndex];
 
-    const handleNext = () => {
+    // Preload camera on last chapter
+    useEffect(() => {
+        if (chapterIndex === story.chapters.length - 1) {
+            setIsCameraPreloading(true);
+        } else {
+            setIsCameraPreloading(false);
+        }
+        // Cleanup on unmount (or when leaving story phase) to be safe, though App.jsx handles it
+        return () => setIsCameraPreloading(false);
+    }, [chapterIndex, story.chapters.length, setIsCameraPreloading]);
+
+    // State to track if user has manually interacted (halts auto-advance)
+    const [isPaused, setIsPaused] = useState(false);
+
+    // Blocking state for last chapter to ensure camera loads
+    const [canAdvanceFromLast, setCanAdvanceFromLast] = useState(false);
+    const isLastChapter = chapterIndex === story.chapters.length - 1;
+
+    useEffect(() => {
+        if (isLastChapter) {
+            setCanAdvanceFromLast(false);
+            const timer = setTimeout(() => {
+                setCanAdvanceFromLast(true);
+            }, 1500); // 3.5s minimum time for camera to initialize
+            return () => clearTimeout(timer);
+        } else {
+            setCanAdvanceFromLast(true);
+        }
+    }, [isLastChapter]);
+
+    const handleNext = (e) => {
+        e?.stopPropagation();
+        setIsPaused(true); // User took control
+
         if (chapterIndex < story.chapters.length - 1) {
             setChapterIndex((prev) => prev + 1);
         } else {
+            // Attempting to go to booth
+            if (isLastChapter && !canAdvanceFromLast) return; // Block if too soon
             setPhase('BOOTH');
         }
     };
 
+    const handleBack = (e) => {
+        e?.stopPropagation();
+        setIsPaused(true); // User took control
+        if (chapterIndex > 0) {
+            setChapterIndex((prev) => prev - 1);
+        }
+    };
+
+    // Keyboard navigation
     useEffect(() => {
-        let timeout;
-        if (currentChapter && currentChapter.delay) {
-            timeout = setTimeout(() => {
+        const handleKeyDown = (e) => {
+            if (e.key === 'ArrowRight' || e.code === 'Space' || e.key === 'Enter') {
+                e.preventDefault();
                 handleNext();
-            }, currentChapter.delay);
+            } else if (e.key === 'ArrowLeft') {
+                e.preventDefault();
+                handleBack();
+            }
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [chapterIndex, isLastChapter, canAdvanceFromLast]); // Re-bind with latest state
+
+    useEffect(() => {
+        // Only auto-advance if not paused
+        let timeout;
+        // Don't auto-advance purely by time on the last chapter if we want to force the camera wait,
+        // but actually the camera wait logic is handled by the block.
+        // However, we should respect the longer delay if auto-advancing on last chapter.
+
+        if (!isPaused && currentChapter && currentChapter.delay) {
+            const delay = (isLastChapter && currentChapter.delay < 3500) ? 3500 : currentChapter.delay;
+
+            timeout = setTimeout(() => {
+                setChapterIndex((prev) => {
+                    if (prev < story.chapters.length - 1) {
+                        return prev + 1;
+                    } else {
+                        // Auto-advance also blocked by the logic? 
+                        // Actually here we are inside the timeout, so if the delay passed, we go.
+                        setPhase('BOOTH');
+                        return prev;
+                    }
+                });
+            }, delay);
         }
         return () => clearTimeout(timeout);
-    }, [chapterIndex, currentChapter]);
+    }, [chapterIndex, currentChapter, isPaused, isLastChapter]); // added isLastChapter dept
+
+    // Parse text to replace variables
+    const displayText = currentChapter.text.replace(/{nickname}/g, nickname);
+
+    // Mouse parallax effect
+    const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
+    useEffect(() => {
+        const handleMouseMove = (e) => {
+            const x = (e.clientX / window.innerWidth - 0.5) * 20;
+            const y = (e.clientY / window.innerHeight - 0.5) * 20;
+            setMousePos({ x, y });
+        };
+        window.addEventListener('mousemove', handleMouseMove);
+        return () => window.removeEventListener('mousemove', handleMouseMove);
+    }, []);
 
     return (
         <div
-            className="h-screen w-full flex items-center justify-center cursor-pointer relative overflow-hidden transition-colors duration-1000"
-            onClick={handleNext}
+            className="h-screen w-full flex items-center justify-center cursor-default relative overflow-hidden transition-colors duration-1000"
+            // Removed global onClick to avoid accidental skips, moving to buttons/areas
             style={{
                 backgroundColor: story.theme.background,
                 color: story.theme.text
             }}
         >
-            {/* Decorative Background Elements */}
-            <div className="absolute top-10 left-10 w-32 h-32 bg-white/30 rounded-full blur-2xl animate-bounce-slight" />
-            <div className="absolute bottom-10 right-10 w-48 h-48 bg-white/30 rounded-full blur-2xl animate-bounce-slight" style={{ animationDelay: '1s' }} />
+            {/* Ambient Background Gradient */}
+            <div
+                className="absolute inset-0 opacity-50"
+                style={{
+                    background: `radial-gradient(circle at 50% 50%, ${story.theme.accent} 0%, transparent 70%)`
+                }}
+            />
+
+            {/* Decorative Floating Elements with Parallax */}
+            <motion.div
+                className="absolute top-1/4 left-1/4 w-64 h-64 bg-white/20 rounded-full blur-3xl"
+                animate={{
+                    x: mousePos.x * -2,
+                    y: mousePos.y * -2,
+                    scale: [1, 1.1, 1],
+                }}
+                transition={{ scale: { duration: 4, repeat: Infinity } }}
+            />
+            <motion.div
+                className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-white/30 rounded-full blur-3xl"
+                animate={{
+                    x: mousePos.x * -1.5,
+                    y: mousePos.y * -1.5,
+                    scale: [1.1, 1, 1.1],
+                }}
+                transition={{ scale: { duration: 5, repeat: Infinity } }}
+            />
 
             <AnimatePresence mode="wait">
                 <motion.div
                     key={chapterIndex}
-                    initial={{ opacity: 0, scale: 0.9, rotate: -2 }}
-                    animate={{ opacity: 1, scale: 1, rotate: 0 }}
-                    exit={{ opacity: 0, scale: 1.1, rotate: 2 }}
-                    transition={{ type: "spring", stiffness: 200, damping: 20 }}
-                    className="max-w-3xl px-12 py-16 bg-white/60 backdrop-blur-md rounded-[3rem] shadow-xl border-4 border-white mx-4 text-center z-10 relative"
+                    initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 1.05, y: -20 }}
+                    transition={
+                        isPaused
+                            ? { type: "spring", stiffness: 400, damping: 30, mass: 0.8 } // Faster/Snappy for manual
+                            : { type: "spring", stiffness: 120, damping: 20 } // Slow/Floaty for auto
+                    }
+                    className="max-w-4xl px-12 py-16 mx-4 text-center z-10 relative cursor-pointer"
+                    onClick={handleNext} // Allow clicking text to advance
+                    style={{
+                        transform: `translate(${mousePos.x}px, ${mousePos.y}px)`
+                    }}
                 >
-                    {/* Cute Sticker Decoration */}
-                    <div className="absolute -top-6 -right-6 text-4xl animate-bounce-slight">
-                        ✨
-                    </div>
-
                     <p
-                        className="text-3xl md:text-5xl font-bold leading-relaxed tracking-wide text-cute-text"
+                        className="text-4xl md:text-6xl font-black leading-tight tracking-tight drop-shadow-sm select-none"
+                        style={{ color: story.theme.text }}
                     >
-                        {currentChapter.text}
+                        {displayText}
                     </p>
                 </motion.div>
             </AnimatePresence>
 
+            {/* Cute Navigation Controls */}
+            <div className="absolute bottom-24 left-0 right-0 flex justify-center gap-12 z-50 pointer-events-none">
+                <AnimatePresence>
+                    {chapterIndex > 0 && (
+                        <motion.button
+                            initial={{ opacity: 0, scale: 0.8, x: 20 }}
+                            animate={{ opacity: 1, scale: 1, x: 0 }}
+                            exit={{ opacity: 0, scale: 0.8, x: 20 }}
+                            whileHover={{ scale: 1.1 }}
+                            whileTap={{ scale: 0.9 }}
+                            onClick={handleBack}
+                            className="pointer-events-auto w-16 h-16 rounded-full bg-white/80 backdrop-blur-md shadow-lg border-2 border-white flex items-center justify-center text-2xl text-cute-text hover:bg-white transition-colors"
+                            aria-label="Previous"
+                        >
+                            👈
+                        </motion.button>
+                    )}
+                </AnimatePresence>
+
+                <motion.button
+                    initial={{ opacity: 0, scale: 0.8, x: -20 }}
+                    animate={{ opacity: 1, scale: 1, x: 0 }}
+                    whileHover={{ scale: 1.1 }}
+                    whileTap={{ scale: 0.9 }}
+                    onClick={handleNext}
+                    disabled={isLastChapter && !canAdvanceFromLast}
+                    className={`pointer-events-auto w-16 h-16 rounded-full bg-white/80 backdrop-blur-md shadow-lg border-2 border-white flex items-center justify-center text-2xl text-cute-text hover:bg-white transition-all ${(isLastChapter && !canAdvanceFromLast) ? 'opacity-50 grayscale cursor-wait' : ''}`}
+                    aria-label="Next"
+                >
+                    {(isLastChapter && !canAdvanceFromLast)
+                        ? <span className="animate-spin text-xl">⏳</span>
+                        : (chapterIndex === story.chapters.length - 1 ? '✨' : '👉')
+                    }
+                </motion.button>
+            </div>
+
             {/* Progress Indicator */}
-            <div className="absolute bottom-12 left-0 right-0 flex justify-center gap-3">
+            <div className="absolute bottom-12 left-0 right-0 flex justify-center gap-3 z-20">
                 {story.chapters.map((_, idx) => (
                     <motion.div
                         key={idx}
                         initial={false}
                         animate={{
-                            width: idx === chapterIndex ? 32 : 12,
-                            backgroundColor: idx === chapterIndex ? story.theme.accent : '#e5e7eb'
+                            width: idx === chapterIndex ? 40 : 12,
+                            opacity: idx === chapterIndex ? 1 : 0.3,
+                            backgroundColor: story.theme.text
                         }}
-                        className="h-3 rounded-full shadow-sm"
+                        className="h-2 rounded-full shadow-sm transition-all duration-500"
                     />
                 ))}
             </div>
+
+            {/* Tap hint (only if not interacting) */}
+            {!isPaused && (
+                <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 0.4 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ delay: 2, duration: 1 }}
+                    className="absolute bottom-6 text-sm font-medium tracking-widest uppercase opacity-40 mix-blend-multiply"
+                >
+                    Tap controls to pause
+                </motion.div>
+            )}
         </div>
     );
 };
