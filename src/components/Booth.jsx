@@ -94,7 +94,7 @@ const Booth = () => {
     return (
         <div className="h-full w-full bg-black relative overflow-hidden flex flex-col items-center justify-center">
             {/* Camera Feed */}
-            <div className="relative w-full h-full max-w-4xl max-h-[80vh] rounded-3xl overflow-hidden shadow-2xl border-4 border-white/20">
+            <div className="relative w-full h-full max-w-[80vh] max-h-[80vh] rounded-3xl overflow-hidden shadow-2xl border-4 border-white/20">
                 <Webcam
                     audio={false}
                     ref={webcamRef}
@@ -103,7 +103,7 @@ const Booth = () => {
                     mirrored={isMirrored}
                     videoConstraints={{
                         facingMode: "user",
-                        width: 1280,
+                        width: 720,
                         height: 720
                     }}
                 />
@@ -155,7 +155,7 @@ const Booth = () => {
                                 ease: "easeInOut",
                                 times: [0, 0.4, 0.7, 1]
                             }}
-                            className="relative w-full h-full max-w-4xl max-h-[80vh] rounded-3xl overflow-hidden border-4 border-white bg-black"
+                            className="relative w-full h-full max-w-[80vh] max-h-[80vh] rounded-3xl overflow-hidden border-4 border-white bg-black"
                         >
                             <img
                                 src={capturedImage}
