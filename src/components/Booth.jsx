@@ -1,12 +1,12 @@
-import React, { useRef, useState, useCallback } from 'react';
+import React, { useRef, useState } from 'react';
 import Webcam from 'react-webcam';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion as Motion, AnimatePresence } from 'framer-motion';
 import { useStore } from '../store';
 import { uploadPhoto } from '../lib/supabase';
 
 const Booth = () => {
     const webcamRef = useRef(null);
-    const { setPhase, setCapturedImage, nickname, capturedImage, isMirrored, setIsMirrored } = useStore();
+    const { setPhase, setCapturedImage, nickname, capturedImage, isMirrored, setIsMirrored, setCapturedImageIsMirrored } = useStore();
 
     const [isCountingDown, setIsCountingDown] = useState(false);
     const [count, setCount] = useState(3);
@@ -31,53 +31,37 @@ const Booth = () => {
         }, 1000);
     };
 
-    const capture = useCallback(async () => {
+    const capture = async () => {
         setIsCountingDown(false);
         setIsFlashing(true);
         setTimeout(() => setIsFlashing(false), 150);
 
-        let imageSrc = webcamRef.current.getScreenshot();
+        const imageSrc = webcamRef.current.getScreenshot();
+        let finalImageSrc = imageSrc;
 
-        // REMOVED: Manual flip "burn-in". We now keep the raw image and flip visually.
-        // if (isMirrored && imageSrc) { ... }
+        // finalImageSrc will be the exact screenshot returned by react-webcam.
+        // We enforce WYSIWYG: captured image will match the preview (mirrored or not).
+        if (imageSrc) {
+            finalImageSrc = imageSrc;
 
-        setCapturedImage(imageSrc);
+            // We enforce WYSIWYG: exported images match the preview. So no un-flipping here.
+        }
+
+        setCapturedImage(finalImageSrc);
+        // Track whether the stored captured image is mirrored (matches preview)
+        setCapturedImageIsMirrored(Boolean(isMirrored));
 
         // Start transition animation
         setIsTransitioning(true);
 
-        // Convert base64 to blob for upload
-        // If flipped, we need to flip it here for the upload ONLY
+        // Upload to Supabase
         try {
             setIsUploading(true);
-            let uploadBlob;
 
-            if (isMirrored) {
-                const flippedDataUrl = await new Promise((resolve) => {
-                    const img = new Image();
-                    img.onload = () => {
-                        const canvas = document.createElement('canvas');
-                        canvas.width = img.width;
-                        canvas.height = img.height;
-                        const ctx = canvas.getContext('2d');
-                        ctx.translate(canvas.width, 0);
-                        ctx.scale(-1, 1);
-                        ctx.drawImage(img, 0, 0);
-                        resolve(canvas.toDataURL('image/png'));
-                    };
-                    img.src = imageSrc;
-                });
-                const res = await fetch(flippedDataUrl);
-                uploadBlob = await res.blob();
-            } else {
-                const res = await fetch(imageSrc);
-                uploadBlob = await res.blob();
-            }
+            // Convert the final (potentially flipped) base64 to blob for upload
+            const res = await fetch(finalImageSrc);
+            const uploadBlob = await res.blob();
 
-            // Upload to Supabase "fire and forget" style or await it?
-            // Let's await it to ensure it's saved before moving on, 
-            // but we could also do it in background.
-            // Given "no safety", let's just try to upload.
             await uploadPhoto(nickname, uploadBlob);
 
             setIsUploading(false);
@@ -90,14 +74,13 @@ const Booth = () => {
         } catch (error) {
             console.error("Upload failed", error);
             setIsUploading(false);
-            // Still move to studio even if upload fails? 
-            // Maybe show error? For now, let's just move on so user isn't stuck.
+            // Still move to studio even if upload fails
             setTimeout(() => {
                 setPhase('STUDIO');
             }, 1200);
         }
 
-    }, [webcamRef, setCapturedImage, setPhase, nickname, isMirrored]);
+    };
 
     return (
         <div className="h-full w-full bg-black relative overflow-hidden flex flex-col items-center justify-center">
@@ -119,7 +102,7 @@ const Booth = () => {
                 {/* Countdown Overlay */}
                 <AnimatePresence>
                     {isCountingDown && (
-                        <motion.div
+                        <Motion.div
                             initial={{ scale: 0.5, opacity: 0 }}
                             animate={{ scale: 1.5, opacity: 1 }}
                             exit={{ scale: 2, opacity: 0 }}
@@ -129,7 +112,7 @@ const Booth = () => {
                             <span className="text-9xl font-black text-white drop-shadow-[0_4px_4px_rgba(0,0,0,0.5)]">
                                 {count}
                             </span>
-                        </motion.div>
+                        </Motion.div>
                     )}
                 </AnimatePresence>
 
@@ -153,7 +136,7 @@ const Booth = () => {
             <AnimatePresence>
                 {isTransitioning && (
                     <div className="absolute inset-0 z-50 flex items-center justify-center pointer-events-none">
-                        <motion.div
+                        <Motion.div
                             initial={{ scale: 1, rotate: 0, opacity: 1 }}
                             animate={{
                                 scale: [1, 1.1, 0.2],
@@ -173,9 +156,9 @@ const Booth = () => {
                             <img
                                 src={capturedImage}
                                 alt="Captured"
-                                className={`w-full h-full object-cover ${isMirrored ? '-scale-x-100' : ''}`}
+                                className="w-full h-full object-cover"
                             />
-                        </motion.div>
+                        </Motion.div>
                     </div>
                 )}
             </AnimatePresence>
@@ -184,7 +167,7 @@ const Booth = () => {
             <div className="absolute bottom-8 left-0 right-0 flex justify-center items-center gap-8 z-10">
                 {!isCountingDown && !isUploading && !isTransitioning && (
                     <>
-                        <motion.button
+                        <Motion.button
                             whileHover={{ scale: 1.1 }}
                             whileTap={{ scale: 0.9 }}
                             onClick={() => setIsMirrored(!isMirrored)}
@@ -195,16 +178,18 @@ const Booth = () => {
                             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-8 h-8 text-white">
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 21 3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5" />
                             </svg>
-                        </motion.button>
+                        </Motion.button>
 
-                        <motion.button
+                        {/* Export is always WYSIWYG (no toggle) - the preview equals exported image */}
+
+                        <Motion.button
                             whileHover={{ scale: 1.1 }}
                             whileTap={{ scale: 0.9 }}
                             onClick={handleStartCapture}
                             className="w-20 h-20 bg-white rounded-full border-4 border-gray-200 shadow-xl flex items-center justify-center group"
                         >
                             <div className="w-16 h-16 bg-cute-pink rounded-full group-hover:bg-pink-400 transition-colors" />
-                        </motion.button>
+                        </Motion.button>
 
                         {/* Spacer to balance the layout */}
                         <div className="w-16 h-16" />

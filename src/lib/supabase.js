@@ -5,11 +5,22 @@ const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 let supabaseInstance = null;
 
-if (supabaseUrl && supabaseAnonKey && supabaseUrl !== 'your_project_url_here') {
+const isValidHttpUrl = (str) => {
     try {
+        const url = new URL(str);
+        return url.protocol === 'http:' || url.protocol === 'https:';
+    } catch {
+        return false;
+    }
+};
+
+if (supabaseUrl && supabaseAnonKey) {
+    if (isValidHttpUrl(supabaseUrl) && supabaseUrl !== 'your_project_url_here') {
+        // Only create the client if the URL looks valid. Any errors thrown by createClient
+        // would indicate a different/internal problem.
         supabaseInstance = createClient(supabaseUrl, supabaseAnonKey);
-    } catch (error) {
-        console.warn('Invalid Supabase URL provided. Uploads will fail.', error);
+    } else {
+        console.warn('Supabase credentials provided but the URL is invalid or a placeholder. Uploads will fail.');
     }
 } else {
     console.warn('Supabase credentials missing or invalid. Uploads will fail.');

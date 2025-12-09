@@ -2,11 +2,11 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Stage, Layer, Image as KonvaImage, Transformer } from 'react-konva';
 import useImage from 'use-image';
 import { useStore } from '../store';
-import { motion } from 'framer-motion';
+import { motion as Motion } from 'framer-motion';
 
 // URLImage component for loading images on canvas
 // Now simplified: it doesn't handle Transformer internally
-const URLImage = ({ src, isBackground = false, isMirrored = false, onSelect, onChange, shapeRef, ...props }) => {
+const URLImage = ({ src, isBackground = false, onSelect, onChange, shapeRef, ...props }) => {
     const [image] = useImage(src, 'anonymous');
 
     // If it's the background, we want it to fill the stage or fit nicely
@@ -46,8 +46,9 @@ const URLImage = ({ src, isBackground = false, isMirrored = false, onSelect, onC
             crop={crop}
             {...props}
             {...props}
-            scaleX={isBackground && isMirrored ? -1 : 1}
-            x={isBackground && isMirrored ? props.width : props.x} // If flipped, move x to width to compensate for negative scale
+            {...props}
+            scaleX={1}
+            x={props.x}
             draggable={!isBackground}
             onClick={onSelect}
             onTap={onSelect}
@@ -87,7 +88,7 @@ const URLImage = ({ src, isBackground = false, isMirrored = false, onSelect, onC
 };
 
 const Studio = () => {
-    const { capturedImage, setPhase, isMirrored } = useStore();
+    const { capturedImage, setPhase, capturedImageIsMirrored } = useStore();
     const stageRef = useRef(null);
     const [stickers, setStickers] = useState([]);
     const [selectedId, selectShape] = useState(null);
@@ -199,7 +200,7 @@ const Studio = () => {
                 onDrop={handleDrop}
                 onDragOver={handleDragOver}
             >
-                <motion.div
+                <Motion.div
                     initial={{ scale: 0.2, rotate: -5, x: 0, opacity: 1 }}
                     animate={{ scale: 1, rotate: 0, x: 0, opacity: 1 }}
                     transition={{
@@ -223,7 +224,6 @@ const Studio = () => {
                                 <URLImage
                                     src={capturedImage}
                                     isBackground={true}
-                                    isMirrored={isMirrored}
                                     x={0}
                                     y={0}
                                     width={stageSize.width}
@@ -261,7 +261,7 @@ const Studio = () => {
                             />
                         </Layer>
                     </Stage>
-                </motion.div>
+                </Motion.div>
             </div>
 
             {/* Sidebar / Controls */}
@@ -269,12 +269,15 @@ const Studio = () => {
                 <div className="p-6 border-b border-gray-100">
                     <h2 className="text-2xl font-black text-cute-pink">Studio</h2>
                     <p className="text-gray-500 text-sm">Drag stickers onto the photo!</p>
+                    {capturedImageIsMirrored && (
+                        <div className="text-xs text-right text-gray-400 mt-1">Mirrored image</div>
+                    )}
                 </div>
 
                 {/* Sticker Grid */}
                 <div className="flex-1 overflow-y-auto p-4 grid grid-cols-3 gap-4 content-start">
                     {stickerList.map((src, i) => (
-                        <motion.div
+                        <Motion.div
                             key={i}
                             whileHover={{ scale: 1.1 }}
                             whileTap={{ scale: 0.9 }}
@@ -284,7 +287,7 @@ const Studio = () => {
                             onClick={() => addSticker(src)} // Keep click to add as well
                         >
                             <img src={src} alt="Sticker" className="w-full h-full object-contain pointer-events-none" />
-                        </motion.div>
+                        </Motion.div>
                     ))}
                 </div>
 
