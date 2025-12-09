@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion as Motion } from 'framer-motion';
 import { useStore } from '../store';
 
 const Login = () => {
@@ -30,7 +30,7 @@ const Login = () => {
     const stickers = Array.from({ length: 16 }, (_, i) => `/stickers/Artboard ${i + 1}.webp`);
 
     return (
-        <div className="flex flex-col h-full w-full bg-white overflow-hidden font-black">
+        <div className="flex flex-col h-full w-full bg-white overflow-y-auto font-black">
             {/* Header */}
             <header className="bg-cute-pink py-6 text-center shrink-0">
                 <h1 className="text-4xl md:text-5xl font-black text-white tracking-tighter drop-shadow-lg">

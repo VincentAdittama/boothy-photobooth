@@ -191,7 +191,7 @@ const Studio = () => {
     const stickerList = Array.from({ length: 16 }, (_, i) => `/stickers/Artboard ${i + 1}.webp`);
 
     return (
-        <div className="h-full w-full bg-gray-100 flex flex-col md:flex-row overflow-hidden">
+        <div className="h-full w-full bg-gray-100 flex flex-col md:flex-row overflow-y-auto">
 
             {/* Main Canvas Area */}
             <div
@@ -275,7 +275,7 @@ const Studio = () => {
                 </div>
 
                 {/* Sticker Grid */}
-                <div className="flex-1 overflow-y-auto p-4 grid grid-cols-3 gap-4 content-start">
+                <div className="flex-1 overflow-y-scroll p-4 grid grid-cols-3 gap-4 content-start">
                     {stickerList.map((src, i) => (
                         <Motion.div
                             key={i}
