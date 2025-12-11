@@ -42,7 +42,7 @@ const URLImage = ({ src, isBackground = false, onSelect, onChange, shapeRef, ...
             ref={shapeRef}
             crop={crop}
             {...props}
-            scaleX={1}
+            scaleX={props.scaleX || 1}
             x={props.x}
             draggable={!isBackground}
             onClick={onSelect}

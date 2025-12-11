@@ -6,7 +6,7 @@ import { uploadPhoto } from '../lib/supabase';
 
 const Booth = () => {
     const webcamRef = useRef(null);
-    const { setPhase, setCapturedImage, nickname, capturedImage, isMirrored, setIsMirrored, setCapturedImageIsMirrored, setIsFlashing, isFlashEnabled, setIsFlashEnabled } = useStore();
+    const { setPhase, setCapturedImage, nickname, capturedImage, isMirrored, setIsMirrored, setCapturedImageIsMirrored, setOriginalCapturedImageIsMirrored, setIsFlashing, isFlashEnabled, setIsFlashEnabled } = useStore();
 
     const [isCountingDown, setIsCountingDown] = useState(false);
     const [count, setCount] = useState(3);
@@ -59,6 +59,7 @@ const Booth = () => {
             setCapturedImage(finalImageSrc);
             // Track whether the stored captured image is mirrored (matches preview)
             setCapturedImageIsMirrored(Boolean(isMirrored));
+            setOriginalCapturedImageIsMirrored(Boolean(isMirrored));
 
             // Start transition animation
             setIsTransitioning(true);

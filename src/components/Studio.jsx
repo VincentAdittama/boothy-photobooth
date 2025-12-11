@@ -6,7 +6,7 @@ import URLImage from './URLImage';
 import { getStickers } from '../data/stickers';
 
 const Studio = () => {
-    const { capturedImage, setPhase, capturedImageIsMirrored } = useStore();
+    const { capturedImage, setPhase, capturedImageIsMirrored, setCapturedImageIsMirrored, originalCapturedImageIsMirrored } = useStore();
     const stageRef = useRef(null);
     const [stickers, setStickers] = useState([]);
     const [selectedId, selectShape] = useState(null);
@@ -143,7 +143,10 @@ const Studio = () => {
                                 <URLImage
                                     src={capturedImage}
                                     isBackground={true}
-                                    x={0}
+                                    // Calculate effective flip based on target vs source orientation
+                                    // If orientations differ, we need to flip the image transform
+                                    x={(capturedImageIsMirrored !== originalCapturedImageIsMirrored) ? stageSize.width : 0}
+                                    scaleX={(capturedImageIsMirrored !== originalCapturedImageIsMirrored) ? -1 : 1}
                                     y={0}
                                     width={stageSize.width}
                                     height={stageSize.height}
@@ -212,6 +215,12 @@ const Studio = () => {
 
                 {/* Actions */}
                 <div className="p-6 border-t border-gray-100 flex flex-col gap-3">
+                    <button
+                        onClick={() => setCapturedImageIsMirrored(!capturedImageIsMirrored)}
+                        className="w-full py-3 bg-white border-2 border-cute-pink text-cute-pink font-bold rounded-xl hover:bg-pink-50 transition-colors"
+                    >
+                        Flip Image
+                    </button>
                     <button
                         onClick={handleDownload}
                         className="w-full py-3 bg-cute-pink text-white font-bold rounded-xl shadow-lg hover:bg-pink-400 transition-colors"
