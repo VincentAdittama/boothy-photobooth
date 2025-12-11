@@ -6,12 +6,17 @@ import { uploadPhoto } from '../lib/supabase';
 
 const Booth = () => {
     const webcamRef = useRef(null);
-    const { setPhase, setCapturedImage, setCapturedImages, nickname, capturedImage, isMirrored, setIsMirrored, setCapturedImageIsMirrored, setOriginalCapturedImageIsMirrored, setIsFlashing, isFlashEnabled, setIsFlashEnabled } = useStore();
+    const { setPhase, setCapturedImage, setCapturedImages, nickname, capturedImages, isMirrored, setIsMirrored, setCapturedImageIsMirrored, setOriginalCapturedImageIsMirrored, setIsFlashing, isFlashEnabled, setIsFlashEnabled } = useStore();
 
     const [isCountingDown, setIsCountingDown] = useState(false);
     const [count, setCount] = useState(3);
     const [isUploading, setIsUploading] = useState(false);
-    const [isTransitioning, setIsTransitioning] = useState(false);
+    const [flyingShots, setFlyingShots] = useState([]); // {id, src, init:{l,t}, delta:{x,y}}
+    const holeRefs = [useRef(null), useRef(null), useRef(null)];
+    const stripRef = useRef(null);
+    const [isStripAnimating, setIsStripAnimating] = useState(false);
+    const [stripDelta, setStripDelta] = useState({ x: 0, y: 0 });
+    const [landedShots, setLandedShots] = useState([false, false, false]);
 
     // Helper to sleep
     const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
@@ -37,6 +42,8 @@ const Booth = () => {
     };
 
     const handleStartStrip = async () => {
+        // reset landed state for new capture sequence
+        setLandedShots([false, false, false]);
         const shots = [];
         const TOTAL_SHOTS = 3;
 
@@ -52,7 +59,21 @@ const Booth = () => {
 
             // Capture
             const shot = await takeShot();
-            if (shot) shots.push(shot);
+            if (shot) {
+                shots.push(shot);
+
+                // trigger fly animation for this shot to its hole
+                await animateShotToHole(shots.length - 1, shot);
+
+                // after animation completes, update preview holes so captured image appears in cuthole
+                setCapturedImages([...shots]);
+                if (shots.length === 1) setCapturedImage(shots[0]);
+                setLandedShots(prev => {
+                    const next = [...prev];
+                    next[shots.length - 1] = true;
+                    return next;
+                });
+            }
 
             // Brief pause/feedback between shots if not last
             if (i < TOTAL_SHOTS - 1) {
@@ -69,8 +90,6 @@ const Booth = () => {
             setCapturedImageIsMirrored(Boolean(isMirrored));
             setOriginalCapturedImageIsMirrored(Boolean(isMirrored));
 
-            // Transition and Upload
-            setIsTransitioning(true);
             setIsUploading(true);
 
             try {
@@ -78,15 +97,15 @@ const Booth = () => {
                 for (const [index, src] of shots.entries()) {
                     const res = await fetch(src);
                     const blob = await res.blob();
-                    // Append index to distinguish files? Or rely on unique timestamp in backend?
-                    // Backend uploadPhoto likely generates unique name.
                     await uploadPhoto(`${nickname}-strip-${index}`, blob);
                 }
             } catch (e) {
                 console.error("Upload failed", e);
             } finally {
                 setIsUploading(false);
-                setTimeout(() => setPhase('STUDIO'), 1200);
+                // play final strip animation then go to STUDIO
+                await animateStripToBooth();
+                setTimeout(() => setPhase('STUDIO'), 300);
             }
         }
     };
@@ -94,8 +113,101 @@ const Booth = () => {
     // Keeping legacy for reference, but UI will use strip
     const handleStartCapture = handleStartStrip; // Alias for now
 
+    // Utility: get center coords of webcam container for initial flying image position
+    const getWebcamCenter = () => {
+        const el = webcamRef.current && webcamRef.current.video ? webcamRef.current.video : webcamRef.current;
+        if (!el) return { left: window.innerWidth / 2, top: window.innerHeight / 2 };
+        const r = el.getBoundingClientRect();
+        return { left: r.left + r.width / 2, top: r.top + r.height / 2 };
+    };
+
+    // Animate single shot from center to the hole index. Returns when animation completes.
+    const animateShotToHole = async (index, src) => {
+        // compute initial center and target hole center
+        const c = getWebcamCenter();
+        const holeEl = holeRefs[index]?.current;
+        let target = { left: 80, top: window.innerHeight / 2 };
+        if (holeEl) {
+            const hr = holeEl.getBoundingClientRect();
+            target = { left: hr.left + hr.width / 2, top: hr.top + hr.height / 2 };
+        }
+
+        const initLeft = c.left;
+        const initTop = c.top;
+        const deltaX = target.left - initLeft;
+        const deltaY = target.top - initTop;
+
+        const id = Date.now() + Math.random();
+        const flying = { id, src, initLeft, initTop, deltaX, deltaY };
+
+        return new Promise((resolve) => {
+            // add flying item
+            setFlyingShots(s => [...s, flying]);
+
+            // wait for animation duration + small buffer
+            const D = 900;
+            setTimeout(() => {
+                // remove flying item after landed
+                setFlyingShots(s => s.filter(f => f.id !== id));
+                resolve();
+            }, D + 50);
+        });
+    };
+
+    // Animate the whole strip toward the booth (center)
+    const animateStripToBooth = async () => {
+        const stripEl = stripRef.current;
+        const c = getWebcamCenter();
+        if (stripEl && stripEl.getBoundingClientRect) {
+            const sr = stripEl.getBoundingClientRect();
+            const stripCenter = { left: sr.left + sr.width / 2, top: sr.top + sr.height / 2 };
+            // compute delta to move strip center into webcam center
+            const dx = c.left - stripCenter.left;
+            const dy = c.top - stripCenter.top;
+            setStripDelta({ x: dx, y: dy });
+        } else {
+            // fallback to simple center shift
+            setStripDelta({ x: window.innerWidth / 2 - 100, y: 0 });
+        }
+
+        setIsStripAnimating(true);
+        await new Promise(r => setTimeout(r, 1200));
+        setIsStripAnimating(false);
+        // reset delta
+        setStripDelta({ x: 0, y: 0 });
+    };
+
     return (
         <div className="h-full w-full bg-black relative overflow-hidden flex flex-col items-center justify-center">
+            {/* Left-side preview strip (desktop only) */}
+            <div className="hidden lg:flex absolute left-6 top-1/2 transform -translate-y-1/2 z-30">
+                <Motion.div
+                    ref={stripRef}
+                    initial={{ scale: 1, rotate: 0, x: 0, y: 0 }}
+                    animate={isStripAnimating ? { x: stripDelta.x, y: stripDelta.y, scale: [1, 1.05, 1], rotate: [0, 5, 0], opacity: 1 } : {}}
+                    transition={{ duration: 1.1, ease: 'easeInOut' }}
+                    className="bg-white/5 p-3 rounded-2xl shadow-2xl border border-white/10"
+                >
+                    <div className="flex flex-col gap-3 items-center">
+                        {Array.from({ length: 3 }).map((_, idx) => (
+                            <Motion.div
+                                key={idx}
+                                ref={holeRefs[idx]}
+                                className="w-28 h-36 bg-white/5 rounded-lg overflow-hidden border-2 border-white/20 flex items-center justify-center"
+                                initial={{ scale: 1, opacity: 1 }}
+                                animate={landedShots[idx] ? { scale: [0.8, 1.05, 1], opacity: [0, 1] } : {}}
+                                transition={{ duration: 0.45, ease: 'easeOut' }}
+                            >
+                                {capturedImages && capturedImages[idx] ? (
+                                    <img src={capturedImages[idx]} alt={`strip-${idx}`} className="w-full h-full object-cover" />
+                                ) : (
+                                    <div className="w-full h-full bg-white/10 flex items-center justify-center text-white/40">---</div>
+                                )}
+                            </Motion.div>
+                        ))}
+                    </div>
+                </Motion.div>
+            </div>
             {/* Camera Feed */}
             <div className="relative w-full h-full max-w-[80vh] max-h-[80vh] rounded-3xl overflow-hidden shadow-2xl border-4 border-white/20">
                 <Webcam
@@ -129,7 +241,7 @@ const Booth = () => {
                 </AnimatePresence>
 
                 {/* Uploading Overlay */}
-                {isUploading && !isTransitioning && (
+                {isUploading && !isStripAnimating && (
                     <div className="absolute inset-0 bg-black/50 z-40 flex items-center justify-center backdrop-blur-sm">
                         <div className="flex flex-col items-center gap-4">
                             <div className="w-12 h-12 border-4 border-white border-t-transparent rounded-full animate-spin" />
@@ -139,43 +251,24 @@ const Booth = () => {
                 )}
             </div>
 
-            {/* Transition Overlay - The "Flying Photo" */}
-            <AnimatePresence>
-                {isTransitioning && (
-                    <div className="absolute inset-0 z-50 flex items-center justify-center pointer-events-none">
-                        <Motion.div
-                            initial={{ scale: 1, rotate: 0, opacity: 1 }}
-                            animate={{
-                                scale: [1, 1.1, 0.2],
-                                rotate: [0, 10, -10, -5],
-                                x: [0, 60, -60, -160],
-                                y: [0, -80, 20, 0],
-                                opacity: 1,
-                                boxShadow: "0px 20px 50px rgba(0,0,0,0.5)"
-                            }}
-                            transition={{
-                                duration: 1.2,
-                                ease: "easeInOut",
-                                times: [0, 0.4, 0.7, 1]
-                            }}
-                            className="relative w-full h-full max-w-[80vh] max-h-[80vh] rounded-3xl overflow-hidden border-4 border-white bg-black flex flex-col"
-                        >
-                            {/* Quick preview of the strip */}
-                            {capturedImage && (
-                                <img
-                                    src={capturedImage}
-                                    alt="Captured"
-                                    className="w-full h-full object-cover"
-                                />
-                            )}
-                        </Motion.div>
-                    </div>
-                )}
-            </AnimatePresence>
+            {/* center transition removed: using left preview -> center strip animation instead */}
+
+            {/* Flying shot visuals (absolute images that animate to holes) */}
+            {flyingShots.map(f => (
+                <Motion.img
+                    key={f.id}
+                    src={f.src}
+                    initial={{ x: 0, y: 0, opacity: 1, rotate: 0 }}
+                    animate={{ x: f.deltaX, y: f.deltaY, scale: [1, 1.05, 0.6], rotate: [0, 8, -6], opacity: 1 }}
+                    transition={{ duration: 0.9, ease: 'easeInOut' }}
+                    style={{ position: 'absolute', left: f.initLeft - 60, top: f.initTop - 80, width: 120, height: 160 }}
+                    className="rounded-md shadow-2xl z-50 pointer-events-none border-2 border-white/20 object-cover"
+                />
+            ))}
 
             {/* Controls */}
             <div className="absolute bottom-8 left-0 right-0 flex justify-center items-center gap-8 z-10">
-                {!isCountingDown && !isUploading && !isTransitioning && (
+                {!isCountingDown && !isUploading && !isStripAnimating && (
                     <>
                         <Motion.button
                             whileHover={{ scale: 1.1 }}
