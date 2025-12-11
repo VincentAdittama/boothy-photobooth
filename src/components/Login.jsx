@@ -1,64 +1,24 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { motion as Motion, useMotionValue, useSpring } from 'framer-motion';
+import React, { useState } from 'react';
+import { motion as Motion } from 'framer-motion';
 import { useStore } from '../store';
+import { useMousePhysics } from '../hooks/useMousePhysics';
+import { getStickers } from '../data/stickers';
 
 const Login = () => {
     const [inputValue, setInputValue] = useState('');
     const { setPhase, setUserType, setNickname } = useStore();
-    const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
-    const [velocity, setVelocity] = useState({ x: 0, y: 0 });
-    const [isHovering, setIsHovering] = useState(false);
-    const mouseRef = useRef({ x: 0, y: 0 });
-    const velRef = useRef({ x: 0, y: 0 });
-    const rafRef = useRef(null);
 
-    // motion values for smooth rotation
-    const rotateMV = useMotionValue(0);
-    const rotateSpring = useSpring(rotateMV, { stiffness: 320, damping: 30 });
-
-    useEffect(() => {
-        // Smooth pointer updates: write raw mouse values to refs in mousemove then
-        // read from refs in a RAF loop to update React state at consistent frames.
-        let prevPos = { x: 0, y: 0 };
-        let prevTime = Date.now();
-        let running = true;
-
-        const handleMouseMove = (e) => {
-            const currentTime = Date.now();
-            const dt = Math.max(currentTime - prevTime, 1);
-            const currentPos = { x: e.clientX, y: e.clientY };
-            const velX = (currentPos.x - prevPos.x) / dt * 1000;
-            const velY = (currentPos.y - prevPos.y) / dt * 1000;
-
-            mouseRef.current = currentPos;
-            velRef.current = { x: velX, y: velY };
-            prevPos = currentPos;
-            prevTime = currentTime;
-        };
-
-        const loop = () => {
-            // snap local state to ref values each rAF for consistent animation updates
-            setMousePos({ ...mouseRef.current });
-            setVelocity({ ...velRef.current });
-            if (running) rafRef.current = requestAnimationFrame(loop);
-        };
-
-        rafRef.current = requestAnimationFrame(loop);
-        window.addEventListener('mousemove', handleMouseMove);
-
-        return () => {
-            running = false;
-            window.removeEventListener('mousemove', handleMouseMove);
-            if (rafRef.current) cancelAnimationFrame(rafRef.current);
-        };
-    }, []);
-
-    // Update rotate MV to reflect current velocity; this reduces jitter by
-    // animating with useSpring for the stick.
-    useEffect(() => {
-        const tiltDeg = Math.min(Math.max((velocity.x || 0) * 0.02 - (velocity.y || 0) * 0.004, -14), 14);
-        rotateMV.set(tiltDeg);
-    }, [velocity.x, velocity.y]);
+    // Use custom hook for physics
+    const {
+        mousePos,
+        velocity,
+        isHovering,
+        setIsHovering,
+        rotateSpring,
+        setMousePos,
+        setVelocity,
+        mouseRef
+    } = useMousePhysics();
 
     const handleLogin = (e) => {
         e.preventDefault();
@@ -81,7 +41,7 @@ const Login = () => {
     };
 
     // Stickers for the footer grid
-    const stickers = Array.from({ length: 16 }, (_, i) => `/stickers/Artboard ${i + 1}.webp`);
+    const stickers = getStickers();
 
     return (
         <div className="flex flex-col h-full w-full bg-white overflow-y-auto font-black">
@@ -149,7 +109,6 @@ const Login = () => {
                                 const targetCenterY = clamp(mousePos.y - STICK_LEN - BOARD_H / 2, 12, vh - BOARD_H - 12);
                                 const targetLeft = targetCenterX - BOARD_W / 2;
                                 const targetTop = targetCenterY - BOARD_H / 2;
-                                const tiltDeg = clamp((velocity.x || 0) * 0.02 - (velocity.y || 0) * 0.004, -14, 14);
 
                                 return (
                                     <Motion.div
@@ -204,12 +163,8 @@ const Login = () => {
                 <div className="max-w-4xl mx-auto grid grid-cols-4 md:grid-cols-8 gap-8 justify-items-center">
                     {stickers.map((sticker, index) => {
                         // Generate random values for "organic" feel
-                        // We use a fixed seed based on index to keep it consistent across re-renders if possible,
-                        // but for this simple component, simple math is fine.
-                        // To avoid hydration mismatches in a real SSR app we'd use useEffect, 
-                        // but for this client-side app simple random is okay or we can use index-based pseudo-random.
-                        const rotate = (index % 2 === 0 ? 1 : -1) * ((index * 7) % 15); // Pseudo-random rotation
-                        const duration = 2 + (index % 3) * 0.5; // Pseudo-random duration
+                        const rotate = (index % 2 === 0 ? 1 : -1) * ((index * 7) % 15);
+                        const duration = 2 + (index % 3) * 0.5;
                         const delay = (index % 5) * 0.2;
 
                         return (
@@ -243,3 +198,4 @@ const Login = () => {
 };
 
 export default Login;
+
