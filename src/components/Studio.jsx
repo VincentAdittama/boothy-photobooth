@@ -6,7 +6,7 @@ import URLImage from './URLImage';
 import { getStickers } from '../data/stickers';
 
 const Studio = () => {
-    const { capturedImage, setPhase, capturedImageIsMirrored, setCapturedImageIsMirrored, originalCapturedImageIsMirrored } = useStore();
+    const { capturedImage, setPhase, capturedImageIsMirrored, setCapturedImageIsMirrored, originalCapturedImageIsMirrored, capturedImages } = useStore();
     const stageRef = useRef(null);
     const [stickers, setStickers] = useState([]);
     const [selectedId, selectShape] = useState(null);
@@ -18,17 +18,47 @@ const Studio = () => {
     const [stageSize, setStageSize] = useState({ width: 800, height: 800 });
     const containerRef = useRef(null);
 
+    // Check if we are in strip mode
+    const isStrip = capturedImages && capturedImages.length > 1;
+
     useEffect(() => {
         if (containerRef.current) {
             const width = containerRef.current.offsetWidth;
             const height = containerRef.current.offsetHeight;
-            const size = Math.min(width, height) - 40; // Padding
-            setStageSize({
-                width: size,
-                height: size
-            });
+
+            if (isStrip) {
+                // Strip sizing: Tall aspect ratio
+                // Let's target a width that fits, and a height that accommodates N images + gaps
+                const count = capturedImages.length;
+                const gap = 20;
+                const aspect = 1; // Square photos in the strip
+
+                // H = N * W + (N-1)*gap + padding
+                // We want to fit this into the container (width x height)
+                // Let's solve for W.
+                // If constrained by container width: W = containerWidth - 40
+                // If constrained by container height: H = containerHeight - 40
+                //   => containerHeight - 40 = N*W + (N-1)*gap
+                //   => W = (containerHeight - 40 - (N-1)*gap) / N
+
+                const wByWidth = width - 40;
+                const wByHeight = (height - 40 - (count - 1) * gap) / count;
+
+                const finalW = Math.min(wByWidth, wByHeight);
+                const finalH = finalW * count + (count - 1) * gap;
+
+                setStageSize({ width: finalW, height: finalH });
+
+            } else {
+                // Single square photo logic
+                const size = Math.min(width, height) - 40;
+                setStageSize({
+                    width: size,
+                    height: size
+                });
+            }
         }
-    }, []);
+    }, [capturedImages, isStrip]);
 
     // Attach transformer to selected node
     useEffect(() => {
@@ -78,7 +108,7 @@ const Studio = () => {
         setTimeout(() => {
             const uri = stageRef.current.toDataURL({ pixelRatio: 2 });
             const link = document.createElement('a');
-            link.download = 'boothy-creation.png';
+            link.download = isStrip ? 'boothy-strip.png' : 'boothy-creation.png';
             link.href = uri;
             document.body.appendChild(link);
             link.click();
@@ -138,13 +168,11 @@ const Studio = () => {
                         ref={stageRef}
                     >
                         <Layer>
-                            {/* Background Photo */}
-                            {capturedImage && (
+                            {/* Background Photo(s) */}
+                            {!isStrip && capturedImage && (
                                 <URLImage
                                     src={capturedImage}
                                     isBackground={true}
-                                    // Calculate effective flip based on target vs source orientation
-                                    // If orientations differ, we need to flip the image transform
                                     x={(capturedImageIsMirrored !== originalCapturedImageIsMirrored) ? stageSize.width : 0}
                                     scaleX={(capturedImageIsMirrored !== originalCapturedImageIsMirrored) ? -1 : 1}
                                     y={0}
@@ -152,6 +180,25 @@ const Studio = () => {
                                     height={stageSize.height}
                                 />
                             )}
+
+                            {isStrip && capturedImages.map((src, i) => {
+                                const photoSize = stageSize.width; // Square photos
+                                const gap = 20;
+                                const yPos = i * (photoSize + gap);
+
+                                return (
+                                    <URLImage
+                                        key={i}
+                                        src={src}
+                                        isBackground={true}
+                                        x={(capturedImageIsMirrored !== originalCapturedImageIsMirrored) ? photoSize : 0}
+                                        scaleX={(capturedImageIsMirrored !== originalCapturedImageIsMirrored) ? -1 : 1}
+                                        y={yPos}
+                                        width={photoSize}
+                                        height={photoSize}
+                                    />
+                                );
+                            })}
 
                             {/* Stickers */}
                             {stickers.map((sticker, i) => (

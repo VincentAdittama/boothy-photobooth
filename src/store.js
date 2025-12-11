@@ -4,7 +4,8 @@ export const useStore = create((set) => ({
     currentPhase: 'LOGIN', // 'LOGIN' | 'STORY' | 'BOOTH' | 'STUDIO'
     userType: 'DEFAULT', // 'DEFAULT' | 'VIP'
     nickname: 'GUEST',
-    capturedImage: null,
+    capturedImage: null, // Legacy: Keeps single image for backward compat or single-shot
+    capturedImages: [], // New: Array for strip mode
     isMirrored: true,
     // Indicates whether the currently stored capturedImage data is mirrored horizontally
     capturedImageIsMirrored: false,
@@ -17,6 +18,7 @@ export const useStore = create((set) => ({
     setUserType: (type) => set({ userType: type }),
     setNickname: (name) => set({ nickname: name }),
     setCapturedImage: (image) => set({ capturedImage: image }),
+    setCapturedImages: (images) => set({ capturedImages: images }),
     setCapturedImageIsMirrored: (isMirrored) => set({ capturedImageIsMirrored: isMirrored }),
     setIsMirrored: (mirrored) => set({ isMirrored: mirrored }),
     setIsFlashing: (flashing) => set({ isFlashing: flashing }),

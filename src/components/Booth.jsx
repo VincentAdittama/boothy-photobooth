@@ -6,91 +6,93 @@ import { uploadPhoto } from '../lib/supabase';
 
 const Booth = () => {
     const webcamRef = useRef(null);
-    const { setPhase, setCapturedImage, nickname, capturedImage, isMirrored, setIsMirrored, setCapturedImageIsMirrored, setOriginalCapturedImageIsMirrored, setIsFlashing, isFlashEnabled, setIsFlashEnabled } = useStore();
+    const { setPhase, setCapturedImage, setCapturedImages, nickname, capturedImage, isMirrored, setIsMirrored, setCapturedImageIsMirrored, setOriginalCapturedImageIsMirrored, setIsFlashing, isFlashEnabled, setIsFlashEnabled } = useStore();
 
     const [isCountingDown, setIsCountingDown] = useState(false);
     const [count, setCount] = useState(3);
     const [isUploading, setIsUploading] = useState(false);
-
     const [isTransitioning, setIsTransitioning] = useState(false);
 
-    const handleStartCapture = () => {
-        setIsCountingDown(true);
-        setCount(3);
+    // Helper to sleep
+    const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
-        const timer = setInterval(() => {
-            setCount((prev) => {
-                if (prev === 1) {
-                    clearInterval(timer);
-                    capture();
-                    return 0;
-                }
-                return prev - 1;
-            });
-        }, 1000);
+    const playSound = (type) => {
+        const audio = new Audio(type === 'shutter' ? '/sounds/shutter.wav' : '/sounds/beep.wav');
+        audio.play().catch(e => console.log('Audio play failed', e));
     };
 
-    const capture = async () => {
-        setIsCountingDown(false);
-
-        // Start flash if enabled
+    const takeShot = async () => {
+        // Flash logic
         if (isFlashEnabled) {
             setIsFlashing(true);
+            setTimeout(() => setIsFlashing(false), 250);
+        }
+        playSound('shutter');
 
-            // End flash after 250ms total (50ms fade in + 200ms full flash)
-            setTimeout(() => {
-                setIsFlashing(false);
-            }, 250);
+        // Wait for flash peak (50ms)
+        await delay(50);
+
+        const imageSrc = webcamRef.current.getScreenshot();
+        return imageSrc;
+    };
+
+    const handleStartStrip = async () => {
+        const shots = [];
+        const TOTAL_SHOTS = 3;
+
+        for (let i = 0; i < TOTAL_SHOTS; i++) {
+            // Countdown
+            setIsCountingDown(true);
+            for (let c = 3; c > 0; c--) {
+                setCount(c);
+                playSound('beep');
+                await delay(1000);
+            }
+            setIsCountingDown(false);
+
+            // Capture
+            const shot = await takeShot();
+            if (shot) shots.push(shot);
+
+            // Brief pause/feedback between shots if not last
+            if (i < TOTAL_SHOTS - 1) {
+                await delay(1000); // Time to change pose!
+            }
         }
 
-        // Snap at peak flash (after 50ms fade in)
-        setTimeout(async () => {
-            const imageSrc = webcamRef.current.getScreenshot();
-            let finalImageSrc = imageSrc;
+        // Done capturing
+        if (shots.length > 0) {
+            setCapturedImages(shots);
+            setCapturedImage(shots[0]); // Set first as preview or primary
 
-            // finalImageSrc will be the exact screenshot returned by react-webcam.
-            // We enforce WYSIWYG: captured image will match the preview (mirrored or not).
-            if (imageSrc) {
-                finalImageSrc = imageSrc;
-
-                // We enforce WYSIWYG: exported images match the preview. So no un-flipping here.
-            }
-
-            setCapturedImage(finalImageSrc);
-            // Track whether the stored captured image is mirrored (matches preview)
+            // Meta info
             setCapturedImageIsMirrored(Boolean(isMirrored));
             setOriginalCapturedImageIsMirrored(Boolean(isMirrored));
 
-            // Start transition animation
+            // Transition and Upload
             setIsTransitioning(true);
+            setIsUploading(true);
 
-            // Upload to Supabase
             try {
-                setIsUploading(true);
-
-                // Convert the final (potentially flipped) base64 to blob for upload
-                const res = await fetch(finalImageSrc);
-                const uploadBlob = await res.blob();
-
-                await uploadPhoto(nickname, uploadBlob);
-
+                // Upload all sequentially
+                for (const [index, src] of shots.entries()) {
+                    const res = await fetch(src);
+                    const blob = await res.blob();
+                    // Append index to distinguish files? Or rely on unique timestamp in backend?
+                    // Backend uploadPhoto likely generates unique name.
+                    await uploadPhoto(`${nickname}-strip-${index}`, blob);
+                }
+            } catch (e) {
+                console.error("Upload failed", e);
+            } finally {
                 setIsUploading(false);
-
-                // Wait a bit for the animation to be "felt" before switching
-                setTimeout(() => {
-                    setPhase('STUDIO');
-                }, 1200);
-
-            } catch (error) {
-                console.error("Upload failed", error);
-                setIsUploading(false);
-                // Still move to studio even if upload fails
-                setTimeout(() => {
-                    setPhase('STUDIO');
-                }, 1200);
+                setTimeout(() => setPhase('STUDIO'), 1200);
             }
-        }, 50);
+        }
     };
+
+    // Keeping legacy for reference, but UI will use strip
+    const handleStartCapture = handleStartStrip; // Alias for now
 
     return (
         <div className="h-full w-full bg-black relative overflow-hidden flex flex-col items-center justify-center">
@@ -131,7 +133,7 @@ const Booth = () => {
                     <div className="absolute inset-0 bg-black/50 z-40 flex items-center justify-center backdrop-blur-sm">
                         <div className="flex flex-col items-center gap-4">
                             <div className="w-12 h-12 border-4 border-white border-t-transparent rounded-full animate-spin" />
-                            <p className="text-white font-bold text-xl">Saving to the cloud...</p>
+                            <p className="text-white font-bold text-xl">Developing photo strip...</p>
                         </div>
                     </div>
                 )}
@@ -156,13 +158,16 @@ const Booth = () => {
                                 ease: "easeInOut",
                                 times: [0, 0.4, 0.7, 1]
                             }}
-                            className="relative w-full h-full max-w-[80vh] max-h-[80vh] rounded-3xl overflow-hidden border-4 border-white bg-black"
+                            className="relative w-full h-full max-w-[80vh] max-h-[80vh] rounded-3xl overflow-hidden border-4 border-white bg-black flex flex-col"
                         >
-                            <img
-                                src={capturedImage}
-                                alt="Captured"
-                                className="w-full h-full object-cover"
-                            />
+                            {/* Quick preview of the strip */}
+                            {capturedImage && (
+                                <img
+                                    src={capturedImage}
+                                    alt="Captured"
+                                    className="w-full h-full object-cover"
+                                />
+                            )}
                         </Motion.div>
                     </div>
                 )}
