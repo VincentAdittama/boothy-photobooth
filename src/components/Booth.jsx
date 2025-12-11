@@ -200,7 +200,7 @@ const Booth = () => {
 
         setIsStripAnimating(true);
         // Wait for animation to finish (inspect -> target)
-        await new Promise(r => setTimeout(r, 3500));
+        await new Promise(r => setTimeout(r, 2800));
     };
 
     return (
@@ -212,13 +212,13 @@ const Booth = () => {
                     initial={{ scale: 1, rotate: 0, x: 0, y: 0 }}
                     animate={isStripAnimating ? {
                         x: [0, stripAnimPath.inspect.x, stripAnimPath.inspect.x, stripAnimPath.target.x],
-                        y: [0, stripAnimPath.inspect.y, stripAnimPath.inspect.y, stripAnimPath.target.y],
+                        y: [0, stripAnimPath.inspect.y, stripAnimPath.inspect.y + 15, stripAnimPath.target.y],
                         scale: [1.1, 1.35, 1.4, stripAnimPath.targetScale],
-                        rotate: [0, -2, 2, 0],
+                        rotate: [0, -5, 5, 0],
                         opacity: 1,
                         transition: {
                             duration: 3.5,
-                            ease: 'easeInOut',
+                            ease: ["backOut", "easeInOut", "backInOut"],
                             times: [0, 0.25, 0.65, 1]
                         }
                     } : {}}
@@ -243,18 +243,18 @@ const Booth = () => {
                             </Motion.div>
                         ))}
                     </div>
-                    
+
                     {/* Shine/Glare Effect */}
                     <Motion.div
                         initial={{ x: '-100%', opacity: 0 }}
-                        animate={isStripAnimating ? { 
+                        animate={isStripAnimating ? {
                             x: ['-100%', '200%'],
                             opacity: [0, 1, 1, 0]
                         } : {}}
-                        transition={{ 
-                            delay: 0.8, 
-                            duration: 1.5, 
-                            ease: "easeInOut" 
+                        transition={{
+                            delay: 0.8,
+                            duration: 1.5,
+                            ease: "easeInOut"
                         }}
                         className="absolute inset-0 w-full h-full bg-gradient-to-tr from-transparent via-white/60 to-transparent z-20 pointer-events-none skew-x-12"
                     />
