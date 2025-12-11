@@ -15,7 +15,11 @@ const Booth = () => {
     const holeRefs = [useRef(null), useRef(null), useRef(null)];
     const stripRef = useRef(null);
     const [isStripAnimating, setIsStripAnimating] = useState(false);
-    const [stripDelta, setStripDelta] = useState({ x: 0, y: 0 });
+    const [stripAnimPath, setStripAnimPath] = useState({
+        inspect: { x: 0, y: 0 },
+        target: { x: 0, y: 0 },
+        targetScale: 1.2
+    });
     const [landedShots, setLandedShots] = useState([false, false, false]);
 
     // Helper to sleep
@@ -154,27 +158,49 @@ const Booth = () => {
         });
     };
 
-    // Animate the whole strip toward the booth (center)
+    // Animate strip through inspect (center screen) then to Studio canvas target
     const animateStripToBooth = async () => {
         const stripEl = stripRef.current;
-        const c = getWebcamCenter();
+
+        // Studio layout: 320px sidebar on desktop; center of editable canvas is the visual target
+        let targetX = window.innerWidth / 2;
+        let targetY = window.innerHeight / 2;
+
+        if (window.innerWidth >= 768) {
+            const sidebarWidth = 320;
+            const canvasWidth = window.innerWidth - sidebarWidth;
+            targetX = canvasWidth / 2;
+        }
+
+        const screenCenter = { left: window.innerWidth / 2, top: window.innerHeight / 2 }; // inspect spot
+        const canvasCenter = { left: targetX, top: targetY }; // final spot
+
         if (stripEl && stripEl.getBoundingClientRect) {
             const sr = stripEl.getBoundingClientRect();
             const stripCenter = { left: sr.left + sr.width / 2, top: sr.top + sr.height / 2 };
-            // compute delta to move strip center into webcam center
-            const dx = c.left - stripCenter.left;
-            const dy = c.top - stripCenter.top;
-            setStripDelta({ x: dx, y: dy });
-        } else {
-            // fallback to simple center shift
-            setStripDelta({ x: window.innerWidth / 2 - 100, y: 0 });
+
+            const inspectDelta = {
+                x: screenCenter.left - stripCenter.left,
+                y: screenCenter.top - stripCenter.top
+            };
+
+            const targetDelta = {
+                x: canvasCenter.left - stripCenter.left,
+                y: canvasCenter.top - stripCenter.top
+            };
+
+            const targetScale = Math.min(2.5, (window.innerHeight - 80) / 384);
+
+            setStripAnimPath({
+                inspect: inspectDelta,
+                target: targetDelta,
+                targetScale
+            });
         }
 
         setIsStripAnimating(true);
-        await new Promise(r => setTimeout(r, 1200));
-        setIsStripAnimating(false);
-        // reset delta
-        setStripDelta({ x: 0, y: 0 });
+        // Wait for animation to finish (inspect -> target)
+        await new Promise(r => setTimeout(r, 3500));
     };
 
     return (
@@ -184,16 +210,27 @@ const Booth = () => {
                 <Motion.div
                     ref={stripRef}
                     initial={{ scale: 1, rotate: 0, x: 0, y: 0 }}
-                    animate={isStripAnimating ? { x: stripDelta.x, y: stripDelta.y, scale: [1, 1.05, 1], rotate: [0, 5, 0], opacity: 1 } : {}}
-                    transition={{ duration: 1.1, ease: 'easeInOut' }}
-                    className="bg-white/5 p-3 rounded-2xl shadow-2xl border border-white/10"
+                    animate={isStripAnimating ? {
+                        x: [0, stripAnimPath.inspect.x, stripAnimPath.inspect.x, stripAnimPath.target.x],
+                        y: [0, stripAnimPath.inspect.y, stripAnimPath.inspect.y, stripAnimPath.target.y],
+                        scale: [1.1, 1.35, 1.4, stripAnimPath.targetScale],
+                        rotate: [0, -2, 2, 0],
+                        opacity: 1,
+                        transition: {
+                            duration: 3.5,
+                            ease: 'easeInOut',
+                            times: [0, 0.25, 0.65, 1]
+                        }
+                    } : {}}
+                    transition={{ type: 'spring', stiffness: 120, damping: 18, mass: 1 }}
+                    className="bg-white p-1 rounded-sm shadow-2xl border-4 border-white relative overflow-hidden"
                 >
-                    <div className="flex flex-col gap-3 items-center">
+                    <div className="flex flex-col gap-[20px] items-center relative z-10">
                         {Array.from({ length: 3 }).map((_, idx) => (
                             <Motion.div
                                 key={idx}
                                 ref={holeRefs[idx]}
-                                className="w-28 h-36 bg-white/5 rounded-lg overflow-hidden border-2 border-white/20 flex items-center justify-center"
+                                className="w-28 h-28 bg-gray-100 overflow-hidden flex items-center justify-center"
                                 initial={{ scale: 1, opacity: 1 }}
                                 animate={landedShots[idx] ? { scale: [0.8, 1.05, 1], opacity: [0, 1] } : {}}
                                 transition={{ duration: 0.45, ease: 'easeOut' }}
@@ -201,11 +238,26 @@ const Booth = () => {
                                 {capturedImages && capturedImages[idx] ? (
                                     <img src={capturedImages[idx]} alt={`strip-${idx}`} className="w-full h-full object-cover" />
                                 ) : (
-                                    <div className="w-full h-full bg-white/10 flex items-center justify-center text-white/40">---</div>
+                                    <div className="w-full h-full bg-gray-100 flex items-center justify-center text-gray-300">---</div>
                                 )}
                             </Motion.div>
                         ))}
                     </div>
+                    
+                    {/* Shine/Glare Effect */}
+                    <Motion.div
+                        initial={{ x: '-100%', opacity: 0 }}
+                        animate={isStripAnimating ? { 
+                            x: ['-100%', '200%'],
+                            opacity: [0, 1, 1, 0]
+                        } : {}}
+                        transition={{ 
+                            delay: 0.8, 
+                            duration: 1.5, 
+                            ease: "easeInOut" 
+                        }}
+                        className="absolute inset-0 w-full h-full bg-gradient-to-tr from-transparent via-white/60 to-transparent z-20 pointer-events-none skew-x-12"
+                    />
                 </Motion.div>
             </div>
             {/* Camera Feed */}

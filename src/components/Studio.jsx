@@ -150,13 +150,12 @@ const Studio = () => {
                 onDragOver={handleDragOver}
             >
                 <Motion.div
-                    initial={{ scale: 0.2, rotate: -5, x: 0, opacity: 1 }}
-                    animate={{ scale: 1, rotate: 0, x: 0, opacity: 1 }}
+                    initial={{ scale: 0.95, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
                     transition={{
                         type: "spring",
-                        stiffness: 260,
-                        damping: 20,
-                        delay: 0.1
+                        stiffness: 300,
+                        damping: 30
                     }}
                     className="shadow-2xl border-4 border-white bg-white"
                 >
