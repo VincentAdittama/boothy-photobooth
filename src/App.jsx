@@ -4,6 +4,7 @@ import { useStore } from './store';
 import Login from './components/Login';
 import Booth from './components/Booth';
 import StoryReader from './components/StoryReader';
+import CurtainTransition from './components/CurtainTransition';
 import Studio from './components/Studio';
 
 function App() {
@@ -13,6 +14,7 @@ function App() {
 
   return (
     <div className="antialiased h-screen w-screen overflow-hidden">
+      <CurtainTransition />
       {currentPhase === 'LOGIN' && <Login />}
       {currentPhase === 'STORY' && <StoryReader />}
 

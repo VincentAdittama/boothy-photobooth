@@ -37,11 +37,11 @@ const Studio = () => {
                 // border-4 (4px) for outer border
                 // padding: var(--strip-padding)
                 // gap: var(--strip-padding)
-                
+
                 const REF_PHOTO_SIZE = 112;
                 const REF_BORDER = 4;
                 const PAD = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--strip-padding')) || 20;
-                
+
                 // Total Reference Dimensions
                 const refW = REF_PHOTO_SIZE + (2 * PAD) + (2 * REF_BORDER);
                 const count = capturedImages.length;
@@ -281,7 +281,7 @@ const Studio = () => {
                 onDrop={handleDrop}
                 onDragOver={handleDragOver}
             >
-                <div className="shadow-2xl border-4 border-white bg-white">
+                <div className="shadow-2xl border-4 border-white bg-white relative z-200">
                     <Stage
                         width={layout.width}
                         height={layout.height}

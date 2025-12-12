@@ -13,6 +13,7 @@ export const useStore = create((set) => ({
     isFlashEnabled: true,
     isCameraPreloading: false, // New state for pre-warming camera
     originalCapturedImageIsMirrored: false, // Tracks the mirroring state of the original captured blob
+    isCurtainOpen: true, // Controls the curtain transition mechanism
 
     setPhase: (phase) => set({ currentPhase: phase }),
     setUserType: (type) => set({ userType: type }),
@@ -25,6 +26,7 @@ export const useStore = create((set) => ({
     setIsFlashEnabled: (enabled) => set({ isFlashEnabled: enabled }),
     setIsCameraPreloading: (preloading) => set({ isCameraPreloading: preloading }),
     setOriginalCapturedImageIsMirrored: (mirrored) => set({ originalCapturedImageIsMirrored: mirrored }),
+    setIsCurtainOpen: (isOpen) => set({ isCurtainOpen: isOpen }),
     // Historically there was an option to un-mirror exported images. We now enforce WYSIWYG
     // behavior so exported photos match the preview (mirrored state).
 }));

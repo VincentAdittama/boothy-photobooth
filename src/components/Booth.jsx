@@ -6,7 +6,7 @@ import { uploadPhoto } from '../lib/supabase';
 
 const Booth = () => {
     const webcamRef = useRef(null);
-    const { setPhase, setCapturedImage, setCapturedImages, nickname, capturedImages, isMirrored, setIsMirrored, setCapturedImageIsMirrored, setOriginalCapturedImageIsMirrored, setIsFlashing, isFlashEnabled, setIsFlashEnabled } = useStore();
+    const { setPhase, setCapturedImage, setCapturedImages, nickname, capturedImages, isMirrored, setIsMirrored, setCapturedImageIsMirrored, setOriginalCapturedImageIsMirrored, setIsFlashing, isFlashEnabled, setIsFlashEnabled, setIsCurtainOpen } = useStore();
 
     const [isCountingDown, setIsCountingDown] = useState(false);
     const [count, setCount] = useState(3);
@@ -107,9 +107,29 @@ const Booth = () => {
                 console.error("Upload failed", e);
             } finally {
                 setIsUploading(false);
-                // play final strip animation then go to STUDIO
-                await animateStripToBooth();
-                setTimeout(() => setPhase('STUDIO'), 300);
+                // play final strip animation
+                // User Request: Curtain animation same time as strip transition
+                // Trigger curtain close somewhat concurrently (mid-animation) to obscure the swap
+                const stripAnimPromise = animateStripToBooth();
+
+                // Wait a bit for strip to do its "Inspect" part, then close curtain as it flies out
+                // Strip animation total is ~2.8s wait (plus spring settle). Keyframes at 0, 0.25, 0.65, 1.
+                // 0.65 * 3.5s = ~2.27s is when it starts moving to target.
+                // So let's start closing curtain around 2s mark so it fully closes as strip lands.
+                await delay(2000);
+                setIsCurtainOpen(false);
+
+                await stripAnimPromise;
+
+                // Ensure curtain is closed before switching
+                // (Curtain anim is 0.8s, we waited ~0.8s remaining of strip anim, so should be close)
+                await delay(500); // Buffer
+
+                setPhase('STUDIO');
+
+                // Wait for Studio to mount
+                await delay(500);
+                setIsCurtainOpen(true);
             }
         }
     };
@@ -206,7 +226,7 @@ const Booth = () => {
     return (
         <div className="h-full w-full bg-black relative overflow-hidden flex flex-col items-center justify-center">
             {/* Left-side preview strip (desktop only) */}
-            <div className="hidden lg:flex absolute left-6 top-1/2 transform -translate-y-1/2 z-30">
+            <div className="hidden lg:flex absolute left-6 top-1/2 transform -translate-y-1/2 z-200">
                 <Motion.div
                     ref={stripRef}
                     initial={{ scale: 1, rotate: 0, x: 0, y: 0 }}
@@ -257,7 +277,7 @@ const Booth = () => {
                             duration: 1.5,
                             ease: "easeInOut"
                         }}
-                        className="absolute inset-0 w-full h-full bg-gradient-to-tr from-transparent via-white/60 to-transparent z-20 pointer-events-none skew-x-12"
+                        className="absolute inset-0 w-full h-full bg-linear-to-tr from-transparent via-white/60 to-transparent z-20 pointer-events-none skew-x-12"
                     />
                 </Motion.div>
             </div>
