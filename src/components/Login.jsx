@@ -11,7 +11,6 @@ const Login = () => {
     // Use custom hook for physics
     const {
         mousePos,
-        velocity,
         isHovering,
         setIsHovering,
         rotateSpring,

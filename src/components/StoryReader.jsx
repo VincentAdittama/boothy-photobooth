@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion as Motion, AnimatePresence } from 'framer-motion';
 import { useStore } from '../store';
 import { storyDatabase } from '../data/stories';
 
@@ -29,18 +29,25 @@ const StoryReader = () => {
     const isLastChapter = chapterIndex === story.chapters.length - 1;
 
     useEffect(() => {
+        let setFalseTimer;
+        let allowTimer;
+
         if (isLastChapter) {
-            setCanAdvanceFromLast(false);
-            const timer = setTimeout(() => {
-                setCanAdvanceFromLast(true);
-            }, 1500); // 3.5s minimum time for camera to initialize
-            return () => clearTimeout(timer);
+            // Avoid calling setState synchronously inside the effect body by deferring
+            setFalseTimer = setTimeout(() => setCanAdvanceFromLast(false), 0);
+            allowTimer = setTimeout(() => setCanAdvanceFromLast(true), 1500); // minimal wait for camera
+            return () => {
+                clearTimeout(setFalseTimer);
+                clearTimeout(allowTimer);
+            };
         } else {
-            setCanAdvanceFromLast(true);
+            // Defer to avoid synchronous setState in effect
+            setFalseTimer = setTimeout(() => setCanAdvanceFromLast(true), 0);
+            return () => clearTimeout(setFalseTimer);
         }
     }, [isLastChapter]);
 
-    const handleNext = (e) => {
+    const handleNext = React.useCallback((e) => {
         e?.stopPropagation();
         setIsPaused(true); // User took control
 
@@ -51,15 +58,15 @@ const StoryReader = () => {
             if (isLastChapter && !canAdvanceFromLast) return; // Block if too soon
             setPhase('BOOTH');
         }
-    };
+    }, [chapterIndex, isLastChapter, canAdvanceFromLast, setPhase, story.chapters.length]);
 
-    const handleBack = (e) => {
+    const handleBack = React.useCallback((e) => {
         e?.stopPropagation();
         setIsPaused(true); // User took control
         if (chapterIndex > 0) {
             setChapterIndex((prev) => prev - 1);
         }
-    };
+    }, [chapterIndex]);
 
     // Keyboard navigation
     useEffect(() => {
@@ -74,7 +81,7 @@ const StoryReader = () => {
         };
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [chapterIndex, isLastChapter, canAdvanceFromLast]); // Re-bind with latest state
+    }, [chapterIndex, isLastChapter, canAdvanceFromLast, handleNext, handleBack]); // Re-bind with latest state
 
     useEffect(() => {
         // Only auto-advance if not paused
@@ -100,7 +107,7 @@ const StoryReader = () => {
             }, delay);
         }
         return () => clearTimeout(timeout);
-    }, [chapterIndex, currentChapter, isPaused, isLastChapter]); // added isLastChapter dept
+    }, [chapterIndex, currentChapter, isPaused, isLastChapter, setPhase, story.chapters.length]); // added deps
 
     // Parse text to replace variables
     const displayText = currentChapter.text.replace(/{nickname}/g, nickname);
@@ -135,7 +142,7 @@ const StoryReader = () => {
             />
 
             {/* Decorative Floating Elements with Parallax */}
-            <motion.div
+            <Motion.div
                 className="absolute top-1/4 left-1/4 w-64 h-64 bg-white/20 rounded-full blur-3xl"
                 animate={{
                     x: mousePos.x * -2,
@@ -144,7 +151,7 @@ const StoryReader = () => {
                 }}
                 transition={{ scale: { duration: 4, repeat: Infinity } }}
             />
-            <motion.div
+            <Motion.div
                 className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-white/30 rounded-full blur-3xl"
                 animate={{
                     x: mousePos.x * -1.5,
@@ -155,7 +162,7 @@ const StoryReader = () => {
             />
 
             <AnimatePresence mode="wait">
-                <motion.div
+                <Motion.div
                     key={chapterIndex}
                     initial={{ opacity: 0, scale: 0.95, y: 20 }}
                     animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -177,14 +184,14 @@ const StoryReader = () => {
                     >
                         {displayText}
                     </p>
-                </motion.div>
+                </Motion.div>
             </AnimatePresence>
 
             {/* Cute Navigation Controls */}
             <div className="absolute bottom-24 left-0 right-0 flex justify-center gap-12 z-50 pointer-events-none">
                 <AnimatePresence>
                     {chapterIndex > 0 && (
-                        <motion.button
+                        <Motion.button
                             initial={{ opacity: 0, scale: 0.8, x: 20 }}
                             animate={{ opacity: 1, scale: 1, x: 0 }}
                             exit={{ opacity: 0, scale: 0.8, x: 20 }}
@@ -195,11 +202,11 @@ const StoryReader = () => {
                             aria-label="Previous"
                         >
                             👈
-                        </motion.button>
+                        </Motion.button>
                     )}
                 </AnimatePresence>
 
-                <motion.button
+                <Motion.button
                     initial={{ opacity: 0, scale: 0.8, x: -20 }}
                     animate={{ opacity: 1, scale: 1, x: 0 }}
                     whileHover={{ scale: 1.1 }}
@@ -213,13 +220,13 @@ const StoryReader = () => {
                         ? <span className="animate-spin text-xl">⏳</span>
                         : (chapterIndex === story.chapters.length - 1 ? '✨' : '👉')
                     }
-                </motion.button>
+                </Motion.button>
             </div>
 
             {/* Progress Indicator */}
             <div className="absolute bottom-12 left-0 right-0 flex justify-center gap-3 z-20">
                 {story.chapters.map((_, idx) => (
-                    <motion.div
+                    <Motion.div
                         key={idx}
                         initial={false}
                         animate={{
@@ -234,7 +241,7 @@ const StoryReader = () => {
 
             {/* Tap hint (only if not interacting) */}
             {!isPaused && (
-                <motion.div
+                <Motion.div
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 0.4 }}
                     exit={{ opacity: 0 }}
@@ -242,7 +249,7 @@ const StoryReader = () => {
                     className="absolute bottom-6 text-sm font-medium tracking-widest uppercase opacity-40 mix-blend-multiply"
                 >
                     Tap controls to pause
-                </motion.div>
+                </Motion.div>
             )}
         </div>
     );
