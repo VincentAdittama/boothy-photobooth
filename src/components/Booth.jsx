@@ -111,26 +111,26 @@ const Booth = ({ hideUI = false }) => {
                 // play final strip animation
                 // User Request: Seamless transition
 
-                // 0. Mark that we're transitioning (prevents Booth from unmounting)
+                // 0. Mark that we're transitioning (this pre-mounts Studio behind the scenes)
                 setIsTransitioning(true);
 
-                // 1. Start the animation (3.5s total)
-                const stripAnimPromise = animateStripToBooth();
-
-                // 2. Wait until the strip is at the inspect position to start closing curtain
-                // SUPER EARLY: Curtain starts closing almost immediately.
+                // 1. Give Studio time to mount and start rendering (300ms for initial render)
                 await delay(300);
-                setIsCurtainOpen(false);
 
-                // 3. Wait for curtain to fully close (0.8s) + strip to reach target.
-                // Animation: 2.5s total. Strip stays at center until 1250ms (0.5 keyframe).
-                // Curtain closed at ~1100ms. Strip flies to target from 1250ms to 2500ms.
-                await delay(2400);
-
+                // 2. Switch to Studio phase
                 setPhase('STUDIO');
 
-                // Wait for Studio to mount and layout to compute
-                await delay(500);
+                // 3. Start the photostrip animation (3.5s total: 500ms intro + 2000ms inspect + 1000ms fly)
+                const stripAnimPromise = animateStripToBooth();
+
+                // 4. Start curtain close transition immediately
+                // Studio is already mounted and rendering at this point
+                setIsCurtainOpen(false);
+
+                // 5. Wait for curtain to close and Studio to fully render
+                // Total time from curtain close to open: 3300ms
+                // Studio has had 3600ms+ total time to load (300ms pre-mount + 3300ms during curtain)
+                await delay(3300);
                 setIsCurtainOpen(true);
 
                 // Clear transition flag after curtain opens
@@ -227,8 +227,8 @@ const Booth = ({ hideUI = false }) => {
         }
 
         setIsStripAnimating(true);
-        // Animation duration is 2.5s. Wait for it to finish.
-        await new Promise(r => setTimeout(r, 2500));
+        // Animation duration is 3.5s (500ms intro + 2000ms inspect + 1000ms fly). Wait for it to finish.
+        await new Promise(r => setTimeout(r, 3500));
     };
 
     return (
@@ -244,9 +244,9 @@ const Booth = ({ hideUI = false }) => {
                         scale: [1.1, 1.35, 1.4, stripAnimPath.targetScale],
                         rotate: [0, -5, 5, 0],
                         transition: {
-                            duration: 2.5,
+                            duration: 3.5,
                             ease: [0.4, 0, 0.2, 1],
-                            times: [0, 0.1, 0.5, 1]
+                            times: [0, 0.143, 0.714, 1]
                         }
                     } : {}}
                     transition={{ type: 'spring', stiffness: 120, damping: 18, mass: 1 }}

@@ -30,9 +30,9 @@ function App() {
         </div>
       )}
 
-      {/* Studio: Wrapped with z-0 to stay behind curtain (z-100) during transition */}
-      {currentPhase === 'STUDIO' && (
-        <div className="h-full w-full z-0">
+      {/* Studio: Pre-mount during transition OR render when active phase */}
+      {(currentPhase === 'STUDIO' || isTransitioning) && (
+        <div className={`h-full w-full z-0 ${isTransitioning && currentPhase !== 'STUDIO' ? 'opacity-0 pointer-events-none' : ''}`}>
           <Studio />
         </div>
       )}
