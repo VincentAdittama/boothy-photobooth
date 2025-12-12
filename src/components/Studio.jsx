@@ -85,11 +85,52 @@ const Studio = () => {
     }, [selectedId, stickers]); // Re-run if stickers change (e.g. re-order or delete)
 
     const checkDeselect = (e) => {
-        const clickedOnEmpty = e.target === e.target.getStage();
-        if (clickedOnEmpty) {
+        const target = e.target;
+        const stage = target.getStage();
+
+        // If clicked directly on stage (empty space) -> deselect
+        if (target === stage) {
             selectShape(null);
+            return;
         }
+
+        // Walk up the node ancestry to see if the click happened on a sticker
+        let node = target;
+        while (node && node !== stage) {
+            // If the clicked node is one of our sticker nodes, don't deselect
+            if (Object.values(stickersRefs.current).includes(node)) {
+                return;
+            }
+
+            // If clicking on the transformer itself, don't deselect
+            if (transformerRef.current && node === transformerRef.current) {
+                return;
+            }
+
+            node = node.getParent();
+        }
+
+        // Otherwise, deselect
+        selectShape(null);
     };
+
+    // Clear selection when clicking outside the stage (e.g., sidebar or other UI)
+    useEffect(() => {
+        const handleDocDown = (e) => {
+            if (!stageRef.current) return;
+            const container = stageRef.current.container();
+            if (!container.contains(e.target)) {
+                selectShape(null);
+            }
+        };
+
+        document.addEventListener('mousedown', handleDocDown);
+        document.addEventListener('touchstart', handleDocDown);
+        return () => {
+            document.removeEventListener('mousedown', handleDocDown);
+            document.removeEventListener('touchstart', handleDocDown);
+        };
+    }, []);
 
     const addSticker = (src, x, y) => {
         const id = `sticker-${Date.now()}`;
