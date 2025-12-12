@@ -103,19 +103,22 @@ const Booth = ({ hideUI = false }) => {
             }
             playSound('shutter');
 
-            // Capture with live photo buffer (this captures 2s after the snap)
-            setIsLiveCapturing(true);
-            const liveResult = await livePhotoBuffer.captureWithBuffer();
-            setIsLiveCapturing(false);
+            // Wait for flash to reach peak before capturing
+            // Flash duration is 250ms, so capture at 200ms when it's at full brightness
+            await delay(200);
 
-            const shot = liveResult.snapFrame; // The high-res snap moment
-            const frames = liveResult.frames; // All 48 frames
+            // Capture snap frame immediately, let buffer continue in background
+            setIsLiveCapturing(true);
+            const liveResultPromise = livePhotoBuffer.captureWithBuffer();
+
+            // Get snap frame right away (it's captured at the start of captureWithBuffer)
+            const shot = webcamRef.current.getScreenshot();
 
             if (shot) {
                 shots.push(shot);
-                allLiveFrames.push(frames);
 
-                // trigger fly animation for this shot to its hole
+                // trigger fly animation for this shot to its hole IMMEDIATELY
+                // Don't wait for live photo buffer to complete
                 await animateShotToHole(shots.length - 1, shot);
 
                 // after animation completes, update preview holes so captured image appears in cuthole
@@ -127,6 +130,12 @@ const Booth = ({ hideUI = false }) => {
                     return next;
                 });
             }
+
+            // Now wait for live photo buffer to complete and gather frames
+            const liveResult = await liveResultPromise;
+            setIsLiveCapturing(false);
+            const frames = liveResult.frames; // All 48 frames
+            allLiveFrames.push(frames);
 
             // Brief pause/feedback between shots if not last
             // Note: captureWithBuffer already takes ~2s for after-frames
@@ -404,7 +413,7 @@ const Booth = ({ hideUI = false }) => {
                         animate={{ x: f.deltaX, y: f.deltaY, scale: [1, 1.05, 0.6], rotate: [0, 8, -6], opacity: 1 }}
                         transition={{ duration: 0.9, ease: 'easeInOut' }}
                         style={{ position: 'absolute', left: f.initLeft - 60, top: f.initTop - 80, width: 120, height: 160 }}
-                        className="rounded-md shadow-2xl z-50 pointer-events-none border-2 border-white/20 object-cover"
+                        className="rounded-md shadow-2xl z-250 pointer-events-none border-2 border-white/20 object-cover"
                     />
                 ))}
 
