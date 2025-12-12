@@ -7,7 +7,7 @@ import { calculateStripLayout } from '../utils/stripLayout';
 
 const Booth = () => {
     const webcamRef = useRef(null);
-    const { setPhase, setCapturedImage, setCapturedImages, nickname, capturedImages, isMirrored, setIsMirrored, setCapturedImageIsMirrored, setOriginalCapturedImageIsMirrored, setIsFlashing, isFlashEnabled, setIsFlashEnabled, setIsCurtainOpen } = useStore();
+    const { setPhase, setCapturedImage, setCapturedImages, nickname, capturedImages, isMirrored, setIsMirrored, setCapturedImageIsMirrored, setOriginalCapturedImageIsMirrored, setIsFlashing, isFlashEnabled, setIsFlashEnabled, setIsCurtainOpen, setIsTransitioning } = useStore();
 
     const [isCountingDown, setIsCountingDown] = useState(false);
     const [count, setCount] = useState(3);
@@ -111,6 +111,9 @@ const Booth = () => {
                 // play final strip animation
                 // User Request: Seamless transition
 
+                // 0. Mark that we're transitioning (prevents Booth from unmounting)
+                setIsTransitioning(true);
+
                 // 1. Start the animation (3.5s total)
                 const stripAnimPromise = animateStripToBooth();
 
@@ -129,6 +132,10 @@ const Booth = () => {
                 // Wait for Studio to mount and layout to compute
                 await delay(500);
                 setIsCurtainOpen(true);
+
+                // Clear transition flag after curtain opens
+                await delay(100);
+                setIsTransitioning(false);
             }
         }
     };
@@ -236,7 +243,6 @@ const Booth = () => {
                         y: [0, stripAnimPath.inspect.y, stripAnimPath.inspect.y + 15, stripAnimPath.target.y],
                         scale: [1.1, 1.35, 1.4, stripAnimPath.targetScale],
                         rotate: [0, -5, 5, 0],
-                        opacity: 1,
                         transition: {
                             duration: 2.5,
                             ease: [0.4, 0, 0.2, 1],
@@ -253,8 +259,8 @@ const Booth = () => {
                                 key={idx}
                                 ref={holeRefs[idx]}
                                 className="w-28 h-28 bg-gray-100 overflow-hidden flex items-center justify-center"
-                                initial={{ scale: 1, opacity: 1 }}
-                                animate={landedShots[idx] ? { scale: [0.8, 1.05, 1], opacity: [0, 1] } : {}}
+                                initial={{ scale: 1 }}
+                                animate={landedShots[idx] ? { scale: [0.8, 1.05, 1] } : {}}
                                 transition={{ duration: 0.45, ease: 'easeOut' }}
                             >
                                 {capturedImages && capturedImages[idx] ? (

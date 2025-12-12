@@ -11,6 +11,7 @@ function App() {
   const currentPhase = useStore((state) => state.currentPhase);
   const isFlashing = useStore((state) => state.isFlashing);
   const isCameraPreloading = useStore((state) => state.isCameraPreloading);
+  const isTransitioning = useStore((state) => state.isTransitioning);
 
   return (
     <div className="antialiased h-screen w-screen overflow-hidden">
@@ -18,14 +19,25 @@ function App() {
       {currentPhase === 'LOGIN' && <Login />}
       {currentPhase === 'STORY' && <StoryReader />}
 
-      {/* Booth: Render if active phase OR if preloading during story (hidden) */}
-      {(currentPhase === 'BOOTH' || (currentPhase === 'STORY' && isCameraPreloading)) && (
-        <div className={currentPhase === 'STORY' ? "fixed inset-0 opacity-0 pointer-events-none -z-50" : "h-full w-full"}>
+      {/* Booth: Render if active phase OR if preloading during story (hidden) OR transitioning to Studio */}
+      {(currentPhase === 'BOOTH' || (currentPhase === 'STORY' && isCameraPreloading) || isTransitioning) && (
+        <div className={
+          currentPhase === 'STORY'
+            ? "fixed inset-0 opacity-0 pointer-events-none -z-50"
+            : isTransitioning
+              ? "h-full w-full opacity-0 pointer-events-none z-0"
+              : "h-full w-full"
+        }>
           <Booth />
         </div>
       )}
 
-      {currentPhase === 'STUDIO' && <Studio />}
+      {/* Studio: Wrapped with z-0 to stay behind curtain (z-100) during transition */}
+      {currentPhase === 'STUDIO' && (
+        <div className="h-full w-full z-0">
+          <Studio />
+        </div>
+      )}
 
       {/* Full Screen Flash Overlay */}
       <AnimatePresence>
