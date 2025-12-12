@@ -114,23 +114,30 @@ const Booth = ({ hideUI = false }) => {
                 // 0. Mark that we're transitioning (this pre-mounts Studio behind the scenes)
                 setIsTransitioning(true);
 
-                // 1. Give Studio time to mount and start rendering (300ms for initial render)
-                await delay(300);
+                // 1. Give Studio time to mount (hidden)
+                await delay(100);
 
-                // 2. Switch to Studio phase
-                setPhase('STUDIO');
+                // 2. Start the photostrip animation (3.5s total)
+                animateStripToBooth();
 
-                // 3. Start the photostrip animation (3.5s total: 500ms intro + 2000ms inspect + 1000ms fly)
-                const stripAnimPromise = animateStripToBooth();
-
-                // 4. Start curtain close transition immediately
-                // Studio is already mounted and rendering at this point
+                // 3. Start curtain close transition immediately (user sees strip + curtain closing)
                 setIsCurtainOpen(false);
 
-                // 5. Wait for curtain to close and Studio to fully render
-                // Total time from curtain close to open: 3300ms
-                // Studio has had 3600ms+ total time to load (300ms pre-mount + 3300ms during curtain)
-                await delay(3300);
+                // 4. Wait for curtain to substantially close (1s)
+                // This hides the screen.
+                await delay(1000);
+
+                // 5. Switch to Studio phase behind the curtain
+                // Studio has been mounted for ~1.1s now (invisible), so it should be ready.
+                // Switching phase makes it "visible" in App (opacity 1) but curtain is covering it.
+                setPhase('STUDIO');
+
+                // 6. Wait for remaining transition time
+                // Total curtain time target: ~3.3s from close to open
+                // We waited 1s already. Wait 2.3s more.
+                await delay(2300);
+
+                // 7. Open curtain to reveal Studio
                 setIsCurtainOpen(true);
 
                 // Clear transition flag after curtain opens

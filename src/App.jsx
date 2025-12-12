@@ -14,7 +14,7 @@ function App() {
   const isTransitioning = useStore((state) => state.isTransitioning);
 
   return (
-    <div className="antialiased h-screen w-screen overflow-hidden">
+    <div className="antialiased h-screen w-screen overflow-hidden relative">
       <CurtainTransition />
       {currentPhase === 'LOGIN' && <Login />}
       {currentPhase === 'STORY' && <StoryReader />}
@@ -24,7 +24,7 @@ function App() {
         <div className={
           currentPhase === 'STORY'
             ? "fixed inset-0 opacity-0 pointer-events-none -z-50"
-            : "h-full w-full"
+            : "absolute inset-0 h-full w-full"
         }>
           <Booth hideUI={isTransitioning} />
         </div>
@@ -32,7 +32,7 @@ function App() {
 
       {/* Studio: Pre-mount during transition OR render when active phase */}
       {(currentPhase === 'STUDIO' || isTransitioning) && (
-        <div className={`h-full w-full z-0 ${isTransitioning && currentPhase !== 'STUDIO' ? 'opacity-0 pointer-events-none' : ''}`}>
+        <div className={`absolute inset-0 h-full w-full z-0 ${isTransitioning && currentPhase !== 'STUDIO' ? 'opacity-0 pointer-events-none' : ''}`}>
           <Studio />
         </div>
       )}
