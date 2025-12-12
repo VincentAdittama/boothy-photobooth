@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Stage, Layer, Transformer } from 'react-konva';
+import { Stage, Layer, Transformer, Rect } from 'react-konva';
 import { useStore } from '../store';
 import { motion as Motion } from 'framer-motion';
 import URLImage from './URLImage';
@@ -15,7 +15,7 @@ const Studio = () => {
     // We need refs for all stickers to attach transformer
     const stickersRefs = useRef({});
 
-    const [stageSize, setStageSize] = useState({ width: 800, height: 800 });
+    const [layout, setLayout] = useState({ width: 800, height: 800, photoSize: 0, pad: 0, gap: 0, border: 0 });
     const containerRef = useRef(null);
 
     // Check if we are in strip mode
@@ -27,34 +27,46 @@ const Studio = () => {
             const height = containerRef.current.offsetHeight;
 
             if (isStrip) {
-                // Strip sizing: Tall aspect ratio
-                // Let's target a width that fits, and a height that accommodates N images + gaps
+                // Reference dimensions from Booth.jsx to ensure WYSIWYG proportions
+                // Booth uses w-28 (112px) for photos
+                // border-4 (4px) for outer border
+                // padding: var(--strip-padding)
+                // gap: var(--strip-padding)
+                
+                const REF_PHOTO_SIZE = 112;
+                const REF_BORDER = 4;
+                const PAD = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--strip-padding')) || 20;
+                
+                // Total Reference Dimensions
+                const refW = REF_PHOTO_SIZE + (2 * PAD) + (2 * REF_BORDER);
                 const count = capturedImages.length;
-                const gap = 20;
-                const aspect = 1; // Square photos in the strip
+                const refH = (REF_PHOTO_SIZE * count) + ((count - 1) * PAD) + (2 * PAD) + (2 * REF_BORDER);
 
-                // H = N * W + (N-1)*gap + padding
-                // We want to fit this into the container (width x height)
-                // Let's solve for W.
-                // If constrained by container width: W = containerWidth - 40
-                // If constrained by container height: H = containerHeight - 40
-                //   => containerHeight - 40 = N*W + (N-1)*gap
-                //   => W = (containerHeight - 40 - (N-1)*gap) / N
+                // Calculate Scale to fit container
+                const scaleX = width / refW;
+                const scaleY = height / refH;
+                const scale = Math.min(scaleX, scaleY) * 0.95; // 0.95 to leave a small margin
 
-                const wByWidth = width - 40;
-                const wByHeight = (height - 40 - (count - 1) * gap) / count;
-
-                const finalW = Math.min(wByWidth, wByHeight);
-                const finalH = finalW * count + (count - 1) * gap;
-
-                setStageSize({ width: finalW, height: finalH });
+                setLayout({
+                    width: refW * scale,
+                    height: refH * scale,
+                    photoSize: REF_PHOTO_SIZE * scale,
+                    pad: PAD * scale,
+                    border: REF_BORDER * scale,
+                    gap: PAD * scale
+                });
 
             } else {
                 // Single square photo logic
-                const size = Math.min(width, height) - 40;
-                setStageSize({
+                const PAD = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--strip-padding')) || 20;
+                const size = Math.min(width, height) - (2 * PAD);
+                setLayout({
                     width: size,
-                    height: size
+                    height: size,
+                    photoSize: size,
+                    pad: 0,
+                    border: 0,
+                    gap: 0
                 });
             }
         }
@@ -81,12 +93,12 @@ const Studio = () => {
 
     const addSticker = (src, x, y) => {
         const id = `sticker-${Date.now()}`;
-        const size = stageSize.width * 0.2;
+        const size = layout.width * 0.2;
 
         // Calculate position to center the sticker
         // If x,y provided (drop), use them as center. If not (click), use stage center.
-        const centerX = x !== undefined ? x : stageSize.width / 2;
-        const centerY = y !== undefined ? y : stageSize.height / 2;
+        const centerX = x !== undefined ? x : layout.width / 2;
+        const centerY = y !== undefined ? y : layout.height / 2;
 
         setStickers([
             ...stickers,
@@ -144,44 +156,46 @@ const Studio = () => {
 
             {/* Main Canvas Area */}
             <div
-                className="flex-1 relative bg-checkered flex items-center justify-center p-4"
+                className="flex-1 relative bg-checkered flex items-center justify-center"
+                style={{ padding: 'var(--strip-padding)' }}
                 ref={containerRef}
                 onDrop={handleDrop}
                 onDragOver={handleDragOver}
             >
                 <div className="shadow-2xl border-4 border-white bg-white">
                     <Stage
-                        width={stageSize.width}
-                        height={stageSize.height}
+                        width={layout.width}
+                        height={layout.height}
                         onMouseDown={checkDeselect}
                         onTouchStart={checkDeselect}
                         ref={stageRef}
                     >
                         <Layer>
+                            <Rect width={layout.width} height={layout.height} fill="white" listening={false} />
                             {/* Background Photo(s) */}
                             {!isStrip && capturedImage && (
                                 <URLImage
                                     src={capturedImage}
                                     isBackground={true}
-                                    x={(capturedImageIsMirrored !== originalCapturedImageIsMirrored) ? stageSize.width : 0}
+                                    x={(capturedImageIsMirrored !== originalCapturedImageIsMirrored) ? layout.width : 0}
                                     scaleX={(capturedImageIsMirrored !== originalCapturedImageIsMirrored) ? -1 : 1}
                                     y={0}
-                                    width={stageSize.width}
-                                    height={stageSize.height}
+                                    width={layout.width}
+                                    height={layout.height}
                                 />
                             )}
 
                             {isStrip && capturedImages.map((src, i) => {
-                                const photoSize = stageSize.width; // Square photos
-                                const gap = 20;
-                                const yPos = i * (photoSize + gap);
+                                const { photoSize, pad, border, gap } = layout;
+                                const yPos = border + pad + i * (photoSize + gap);
+                                const xPos = border + pad;
 
                                 return (
                                     <URLImage
                                         key={i}
                                         src={src}
                                         isBackground={true}
-                                        x={(capturedImageIsMirrored !== originalCapturedImageIsMirrored) ? photoSize : 0}
+                                        x={(capturedImageIsMirrored !== originalCapturedImageIsMirrored) ? (xPos + photoSize) : xPos}
                                         scaleX={(capturedImageIsMirrored !== originalCapturedImageIsMirrored) ? -1 : 1}
                                         y={yPos}
                                         width={photoSize}

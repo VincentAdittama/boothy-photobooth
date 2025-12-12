@@ -223,9 +223,10 @@ const Booth = () => {
                         }
                     } : {}}
                     transition={{ type: 'spring', stiffness: 120, damping: 18, mass: 1 }}
-                    className="bg-white p-1 rounded-sm shadow-2xl border-4 border-white relative overflow-hidden"
+                    className="bg-white rounded-sm shadow-2xl border-4 border-white relative overflow-hidden"
+                    style={{ padding: 'var(--strip-padding)' }}
                 >
-                    <div className="flex flex-col gap-[20px] items-center relative z-10">
+                    <div className="flex flex-col items-center relative z-10" style={{ gap: 'var(--strip-padding)' }}>
                         {Array.from({ length: 3 }).map((_, idx) => (
                             <Motion.div
                                 key={idx}

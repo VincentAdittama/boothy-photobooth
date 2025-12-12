@@ -58,3 +58,9 @@ body {
   font-family: var(--font-cute);
   overflow: hidden;
 }
+
+:root {
+  /* Single control for strip padding/gap used across Booth and Studio
+     Increase this value to make the strip spacing larger (WYSIWYG). */
+  --strip-padding: 14px;
+}
