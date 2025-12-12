@@ -3,7 +3,7 @@ import { Image as KonvaImage } from 'react-konva';
 import useImage from 'use-image';
 
 // URLImage component for loading images on canvas
-const URLImage = ({ src, isBackground = false, onSelect, onChange, shapeRef, ...props }) => {
+const URLImage = ({ src, isBackground = false, onSelect, onChange, onDragStart, onDragEnd, shapeRef, ...props }) => {
     const [image] = useImage(src, 'anonymous');
 
     // If it's the background, we want it to fill the stage or fit nicely
@@ -47,14 +47,24 @@ const URLImage = ({ src, isBackground = false, onSelect, onChange, shapeRef, ...
             draggable={!isBackground}
             onClick={onSelect}
             onTap={onSelect}
+            onDragStart={(e) => {
+                if (!isBackground && onDragStart) {
+                    onDragStart();
+                }
+            }}
             onDragEnd={(e) => {
-                if (!isBackground && onChange) {
-                    onChange({
+                if (!isBackground) {
+                    const newAttrs = {
                         ...props,
-                        src, // Critical: Add src back because it was destructured
+                        src,
                         x: e.target.x(),
                         y: e.target.y(),
-                    });
+                    };
+                    if (onDragEnd) {
+                        onDragEnd(newAttrs);
+                    } else if (onChange) {
+                        onChange(newAttrs);
+                    }
                 }
             }}
             onTransformEnd={(e) => {

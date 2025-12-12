@@ -38,8 +38,44 @@ const Studio = () => {
     // Check if currently editing a photo
     const isEditing = currentlyEditingPhotoIndex !== null;
 
+    const [isHoveringSticker, setIsHoveringSticker] = useState(false);
+    const [isDraggingSticker, setIsDraggingSticker] = useState(false);
+
+    // Hit detection to manage z-index interaction between stickers (canvas) and DOM overlays
+    useEffect(() => {
+        const handleMouseMove = (e) => {
+            if (!stageRef.current) return;
+
+            // Convert viewport coordinates to stage-relative coordinates
+            const container = stageRef.current.container();
+            const rect = container.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+
+            // Only check intersection if mouse is within stage bounds
+            if (x < 0 || y < 0 || x > layout.width || y > layout.height) {
+                setIsHoveringSticker(false);
+                return;
+            }
+
+            const shape = stageRef.current.getIntersection({ x, y });
+
+            if (shape && shape.name() === 'sticker') {
+                setIsHoveringSticker(true);
+            } else if (shape && shape.getParent()?.getClassName() === 'Transformer') {
+                setIsHoveringSticker(true);
+            } else {
+                setIsHoveringSticker(false);
+            }
+        };
+
+        window.addEventListener('mousemove', handleMouseMove);
+        return () => window.removeEventListener('mousemove', handleMouseMove);
+    }, [layout.width, layout.height]);
+
     useEffect(() => {
         if (containerRef.current) {
+
             const width = containerRef.current.offsetWidth;
             const height = containerRef.current.offsetHeight;
 
@@ -304,6 +340,7 @@ const Studio = () => {
                             {!isStrip && capturedImage && (
                                 <URLImage
                                     src={capturedImage}
+                                    name="background"
                                     isBackground={true}
                                     x={(capturedImageIsMirrored !== originalCapturedImageIsMirrored) ? layout.width : 0}
                                     scaleX={(capturedImageIsMirrored !== originalCapturedImageIsMirrored) ? -1 : 1}
@@ -322,6 +359,7 @@ const Studio = () => {
                                     <URLImage
                                         key={i}
                                         src={src}
+                                        name="background"
                                         isBackground={true}
                                         x={(capturedImageIsMirrored !== originalCapturedImageIsMirrored) ? (xPos + photoSize) : xPos}
                                         scaleX={(capturedImageIsMirrored !== originalCapturedImageIsMirrored) ? -1 : 1}
@@ -336,12 +374,20 @@ const Studio = () => {
                             {stickers.map((sticker, i) => (
                                 <URLImage
                                     key={sticker.id}
+                                    name="sticker"
                                     {...sticker}
                                     shapeRef={(node) => {
                                         stickersRefs.current[sticker.id] = node;
                                     }}
                                     isSelected={sticker.id === selectedId}
                                     onSelect={() => selectShape(sticker.id)}
+                                    onDragStart={() => setIsDraggingSticker(true)}
+                                    onDragEnd={(newAttrs) => {
+                                        setIsDraggingSticker(false);
+                                        const slice = stickers.slice();
+                                        slice[i] = newAttrs;
+                                        setStickers(slice);
+                                    }}
                                     onChange={(newAttrs) => {
                                         const slice = stickers.slice();
                                         slice[i] = newAttrs;
@@ -375,7 +421,7 @@ const Studio = () => {
                                 return hasFrames ? (
                                     <Motion.button
                                         key={`edit-${i}`}
-                                        className="absolute pointer-events-auto bg-transparent hover:bg-black/10 transition-colors cursor-pointer group"
+                                        className={`absolute transition-all duration-200 cursor-pointer group ${(isHoveringSticker || isDraggingSticker) ? 'pointer-events-none opacity-0' : 'pointer-events-auto bg-transparent hover:bg-black/10 opacity-100'}`}
                                         style={{
                                             left: xPos,
                                             top: yPos,
@@ -447,8 +493,8 @@ const Studio = () => {
                     <button
                         onClick={() => setCapturedImageIsMirrored(!capturedImageIsMirrored)}
                         className={`w-full py-3 font-bold rounded-xl transition-colors ${capturedImageIsMirrored
-                                ? 'bg-cute-pink text-white hover:bg-pink-400'
-                                : 'bg-white border-2 border-cute-pink text-cute-pink hover:bg-pink-50'
+                            ? 'bg-cute-pink text-white hover:bg-pink-400'
+                            : 'bg-white border-2 border-cute-pink text-cute-pink hover:bg-pink-50'
                             }`}
                     >
                         {capturedImageIsMirrored ? '✓ Flipped' : 'Flip Image'}
