@@ -1,13 +1,18 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Stage, Layer, Transformer, Rect } from 'react-konva';
 import { useStore } from '../store';
-import { motion as Motion } from 'framer-motion';
+import { motion as Motion, AnimatePresence } from 'framer-motion';
 import URLImage from './URLImage';
 import { getStickers } from '../data/stickers';
 import { calculateStripLayout } from '../utils/stripLayout';
+import LivePhotoEditor from './LivePhotoEditor';
 
 const Studio = () => {
-    const { capturedImage, setPhase, capturedImageIsMirrored, setCapturedImageIsMirrored, originalCapturedImageIsMirrored, capturedImages } = useStore();
+    const {
+        capturedImage, setPhase, capturedImageIsMirrored, setCapturedImageIsMirrored,
+        originalCapturedImageIsMirrored, capturedImages, livePhotoFrames,
+        currentlyEditingPhotoIndex, setCurrentlyEditingPhotoIndex
+    } = useStore();
     const stageRef = useRef(null);
     const [stickers, setStickers] = useState([]);
     const [selectedId, selectShape] = useState(null);
@@ -26,6 +31,12 @@ const Studio = () => {
 
     // Check if we are in strip mode
     const isStrip = capturedImages && capturedImages.length > 1;
+
+    // Check if we have Live Photo frames available
+    const hasLivePhotos = livePhotoFrames && livePhotoFrames.length > 0;
+
+    // Check if currently editing a photo
+    const isEditing = currentlyEditingPhotoIndex !== null;
 
     useEffect(() => {
         if (containerRef.current) {
@@ -251,16 +262,33 @@ const Studio = () => {
     // Use centralized stickers
     const stickerList = getStickers();
 
+    // Handle clicking on a photo in the strip to edit its Live Photo
+    const handlePhotoClick = (photoIndex) => {
+        if (hasLivePhotos && livePhotoFrames[photoIndex]) {
+            setCurrentlyEditingPhotoIndex(photoIndex);
+        }
+    };
+
+    // Close the Live Photo editor
+    const handleCloseEditor = () => {
+        setCurrentlyEditingPhotoIndex(null);
+    };
+
     return (
         <div className="h-full w-full bg-gray-100 flex flex-col md:flex-row overflow-y-auto">
 
             {/* Main Canvas Area */}
-            <div
+            <Motion.div
                 className="flex-1 relative bg-checkered flex items-center justify-center"
                 style={{ padding: 'var(--strip-padding)' }}
                 ref={containerRef}
                 onDrop={handleDrop}
                 onDragOver={handleDragOver}
+                animate={{
+                    x: isEditing ? -200 : 0,
+                    opacity: isEditing ? 0.3 : 1
+                }}
+                transition={{ type: 'spring', stiffness: 300, damping: 30 }}
             >
                 <div className="shadow-2xl border-4 border-white bg-white relative z-200">
                     <Stage
@@ -334,14 +362,67 @@ const Studio = () => {
                             />
                         </Layer>
                     </Stage>
+
+                    {/* Clickable photo overlays for Live Photo editing (strip mode only) */}
+                    {isStrip && hasLivePhotos && !isEditing && (
+                        <div className="absolute inset-0 pointer-events-none">
+                            {capturedImages.map((_, i) => {
+                                const { photoSize, pad, border, gap } = layout;
+                                const yPos = border + pad + i * (photoSize + gap);
+                                const xPos = border + pad;
+                                const hasFrames = livePhotoFrames[i] && livePhotoFrames[i].length > 0;
+
+                                return hasFrames ? (
+                                    <Motion.button
+                                        key={`edit-${i}`}
+                                        className="absolute pointer-events-auto bg-transparent hover:bg-black/10 transition-colors cursor-pointer group"
+                                        style={{
+                                            left: xPos,
+                                            top: yPos,
+                                            width: photoSize,
+                                            height: photoSize
+                                        }}
+                                        onClick={() => handlePhotoClick(i)}
+                                        whileHover={{ scale: 1.02 }}
+                                        whileTap={{ scale: 0.98 }}
+                                    >
+                                        {/* Live Photo indicator */}
+                                        <div className="absolute top-2 left-2 px-2 py-1 bg-black/60 rounded-full text-white text-xs font-bold opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
+                                            <span className="w-2 h-2 bg-yellow-400 rounded-full animate-pulse" />
+                                            LIVE
+                                        </div>
+                                        {/* Edit hint */}
+                                        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <div className="px-4 py-2 bg-black/70 rounded-xl text-white font-bold">
+                                                Choose Best Frame
+                                            </div>
+                                        </div>
+                                    </Motion.button>
+                                ) : null;
+                            })}
+                        </div>
+                    )}
                 </div>
-            </div>
+            </Motion.div>
 
             {/* Sidebar / Controls */}
-            <div className="w-full md:w-80 bg-white border-l border-gray-200 flex flex-col shrink-0 z-10">
+            <Motion.div
+                className="w-full md:w-80 bg-white border-l border-gray-200 flex flex-col shrink-0 z-10"
+                animate={{
+                    x: isEditing ? 100 : 0,
+                    opacity: isEditing ? 0.3 : 1
+                }}
+                transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+            >
                 <div className="p-6 border-b border-gray-100">
                     <h2 className="text-2xl font-black text-cute-pink">Studio</h2>
                     <p className="text-gray-500 text-sm">Drag stickers onto the photo!</p>
+                    {hasLivePhotos && (
+                        <div className="mt-2 flex items-center gap-2 text-xs text-gray-400">
+                            <span className="w-2 h-2 bg-yellow-400 rounded-full animate-pulse" />
+                            Click photos to edit Live frames
+                        </div>
+                    )}
                     {capturedImageIsMirrored && (
                         <div className="text-xs text-right text-gray-400 mt-1">Mirrored image</div>
                     )}
@@ -385,10 +466,19 @@ const Studio = () => {
                         Retake Photo
                     </button>
                 </div>
-            </div>
+            </Motion.div>
+
+            {/* Live Photo Editor Modal */}
+            <AnimatePresence>
+                {isEditing && (
+                    <LivePhotoEditor
+                        photoIndex={currentlyEditingPhotoIndex}
+                        onClose={handleCloseEditor}
+                    />
+                )}
+            </AnimatePresence>
         </div>
     );
 };
 
 export default Studio;
-

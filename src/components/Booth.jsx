@@ -1,13 +1,28 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import Webcam from 'react-webcam';
 import { motion as Motion, AnimatePresence } from 'framer-motion';
 import { useStore } from '../store';
 import { uploadPhoto } from '../lib/supabase';
 import { calculateStripLayout } from '../utils/stripLayout';
+import useLivePhotoBuffer from '../hooks/useLivePhotoBuffer';
 
 const Booth = ({ hideUI = false }) => {
     const webcamRef = useRef(null);
-    const { setPhase, setCapturedImage, setCapturedImages, nickname, capturedImages, isMirrored, setIsMirrored, setCapturedImageIsMirrored, setOriginalCapturedImageIsMirrored, setIsFlashing, isFlashEnabled, setIsFlashEnabled, setIsCurtainOpen, setIsTransitioning } = useStore();
+    const {
+        setPhase, setCapturedImage, setCapturedImages, nickname, capturedImages,
+        isMirrored, setIsMirrored, setCapturedImageIsMirrored, setOriginalCapturedImageIsMirrored,
+        setIsFlashing, isFlashEnabled, setIsFlashEnabled, setIsCurtainOpen, setIsTransitioning,
+        setLivePhotoFrames, resetLivePhotoState
+    } = useStore();
+
+    // Live Photo buffer hook - captures frames before and after each snap
+    const livePhotoBuffer = useLivePhotoBuffer(webcamRef, {
+        fps: 12,
+        duration: 2,
+        quality: 0.5,
+        scale: 0.5,
+        isMirrored: isMirrored  // Pass current mirror state to ensure consistency
+    });
 
     const [isCountingDown, setIsCountingDown] = useState(false);
     const [count, setCount] = useState(3);
@@ -22,6 +37,17 @@ const Booth = ({ hideUI = false }) => {
         targetScale: 1.2
     });
     const [landedShots, setLandedShots] = useState([false, false, false]);
+    const [isLiveCapturing, setIsLiveCapturing] = useState(false);
+
+    // Start live photo buffering when booth is visible
+    useEffect(() => {
+        if (!hideUI) {
+            livePhotoBuffer.startBuffering();
+        }
+        return () => {
+            livePhotoBuffer.stopBuffering();
+        };
+    }, [hideUI]);
 
     // Helper to sleep
     const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
@@ -47,10 +73,18 @@ const Booth = ({ hideUI = false }) => {
     };
 
     const handleStartStrip = async () => {
-        // reset landed state for new capture sequence
+        // reset landed state and live photo state for new capture sequence
         setLandedShots([false, false, false]);
+        resetLivePhotoState();
         const shots = [];
+        const allLiveFrames = [];
         const TOTAL_SHOTS = 3;
+
+        // Ensure live photo buffering is active
+        if (!livePhotoBuffer.isBuffering) {
+            livePhotoBuffer.startBuffering();
+            await delay(500); // Give buffer time to warm up
+        }
 
         for (let i = 0; i < TOTAL_SHOTS; i++) {
             // Countdown
@@ -62,10 +96,24 @@ const Booth = ({ hideUI = false }) => {
             }
             setIsCountingDown(false);
 
-            // Capture
-            const shot = await takeShot();
+            // Flash effect
+            if (isFlashEnabled) {
+                setIsFlashing(true);
+                setTimeout(() => setIsFlashing(false), 250);
+            }
+            playSound('shutter');
+
+            // Capture with live photo buffer (this captures 2s after the snap)
+            setIsLiveCapturing(true);
+            const liveResult = await livePhotoBuffer.captureWithBuffer();
+            setIsLiveCapturing(false);
+
+            const shot = liveResult.snapFrame; // The high-res snap moment
+            const frames = liveResult.frames; // All 48 frames
+
             if (shot) {
                 shots.push(shot);
+                allLiveFrames.push(frames);
 
                 // trigger fly animation for this shot to its hole
                 await animateShotToHole(shots.length - 1, shot);
@@ -81,10 +129,14 @@ const Booth = ({ hideUI = false }) => {
             }
 
             // Brief pause/feedback between shots if not last
+            // Note: captureWithBuffer already takes ~2s for after-frames
             if (i < TOTAL_SHOTS - 1) {
-                await delay(1000); // Time to change pose!
+                await delay(500); // Reduced delay since capture takes longer now
             }
         }
+
+        // Store all live photo frames
+        setLivePhotoFrames(allLiveFrames);
 
         // Done capturing
         if (shots.length > 0) {

@@ -16,6 +16,11 @@ export const useStore = create((set) => ({
     isCurtainOpen: true, // Controls the curtain transition mechanism
     isTransitioning: false, // Tracks when transitioning from Booth to Studio (prevents Booth unmount)
 
+    // Live Photo feature state
+    livePhotoFrames: [], // Array of frame arrays, one per captured image (48 frames each)
+    selectedFrameIndices: [24, 24, 24], // Default to center frame (the snap moment) for each photo
+    currentlyEditingPhotoIndex: null, // Which photo is being edited in the timeline (null = none)
+
     setPhase: (phase) => set({ currentPhase: phase }),
     setUserType: (type) => set({ userType: type }),
     setNickname: (name) => set({ nickname: name }),
@@ -29,6 +34,28 @@ export const useStore = create((set) => ({
     setOriginalCapturedImageIsMirrored: (mirrored) => set({ originalCapturedImageIsMirrored: mirrored }),
     setIsCurtainOpen: (isOpen) => set({ isCurtainOpen: isOpen }),
     setIsTransitioning: (transitioning) => set({ isTransitioning: transitioning }),
+
+    // Live Photo feature actions
+    setLivePhotoFrames: (frames) => set({ livePhotoFrames: frames }),
+    setSelectedFrameIndex: (photoIndex, frameIndex) => set((state) => ({
+        selectedFrameIndices: state.selectedFrameIndices.map((f, i) =>
+            i === photoIndex ? frameIndex : f
+        )
+    })),
+    setCurrentlyEditingPhotoIndex: (index) => set({ currentlyEditingPhotoIndex: index }),
+    // Update a specific captured image (used when confirming frame selection)
+    updateCapturedImage: (photoIndex, newImageSrc) => set((state) => ({
+        capturedImages: state.capturedImages.map((img, i) =>
+            i === photoIndex ? newImageSrc : img
+        )
+    })),
+    // Reset Live Photo state for new capture
+    resetLivePhotoState: () => set({
+        livePhotoFrames: [],
+        selectedFrameIndices: [24, 24, 24],
+        currentlyEditingPhotoIndex: null
+    }),
+
     // Historically there was an option to un-mirror exported images. We now enforce WYSIWYG
     // behavior so exported photos match the preview (mirrored state).
 }));
