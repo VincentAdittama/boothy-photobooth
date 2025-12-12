@@ -3,6 +3,7 @@ import Webcam from 'react-webcam';
 import { motion as Motion, AnimatePresence } from 'framer-motion';
 import { useStore } from '../store';
 import { uploadPhoto } from '../lib/supabase';
+import { calculateStripLayout } from '../utils/stripLayout';
 
 const Booth = () => {
     const webcamRef = useRef(null);
@@ -108,26 +109,24 @@ const Booth = () => {
             } finally {
                 setIsUploading(false);
                 // play final strip animation
-                // User Request: Curtain animation same time as strip transition
-                // Trigger curtain close somewhat concurrently (mid-animation) to obscure the swap
+                // User Request: Seamless transition
+
+                // 1. Start the animation (3.5s total)
                 const stripAnimPromise = animateStripToBooth();
 
-                // Wait a bit for strip to do its "Inspect" part, then close curtain as it flies out
-                // Strip animation total is ~2.8s wait (plus spring settle). Keyframes at 0, 0.25, 0.65, 1.
-                // 0.65 * 3.5s = ~2.27s is when it starts moving to target.
-                // So let's start closing curtain around 2s mark so it fully closes as strip lands.
-                await delay(2000);
+                // 2. Wait until the strip is at the inspect position to start closing curtain
+                // SUPER EARLY: Curtain starts closing almost immediately.
+                await delay(300);
                 setIsCurtainOpen(false);
 
-                await stripAnimPromise;
-
-                // Ensure curtain is closed before switching
-                // (Curtain anim is 0.8s, we waited ~0.8s remaining of strip anim, so should be close)
-                await delay(500); // Buffer
+                // 3. Wait for curtain to fully close (0.8s) + strip to reach target.
+                // Animation: 2.5s total. Strip stays at center until 1250ms (0.5 keyframe).
+                // Curtain closed at ~1100ms. Strip flies to target from 1250ms to 2500ms.
+                await delay(2400);
 
                 setPhase('STUDIO');
 
-                // Wait for Studio to mount
+                // Wait for Studio to mount and layout to compute
                 await delay(500);
                 setIsCurtainOpen(true);
             }
@@ -182,15 +181,19 @@ const Booth = () => {
     const animateStripToBooth = async () => {
         const stripEl = stripRef.current;
 
-        // Studio layout: 320px sidebar on desktop; center of editable canvas is the visual target
-        let targetX = window.innerWidth / 2;
-        let targetY = window.innerHeight / 2;
+        // Use the exact same layout logic as Studio to determine target scale/pos
+        const isDesktop = window.innerWidth >= 768;
+        const containerW = isDesktop ? window.innerWidth - 320 : window.innerWidth;
+        const containerH = window.innerHeight;
 
-        if (window.innerWidth >= 768) {
-            const sidebarWidth = 320;
-            const canvasWidth = window.innerWidth - sidebarWidth;
-            targetX = canvasWidth / 2;
-        }
+        const layout = calculateStripLayout(containerW, containerH, 3);
+
+        // Target X needs to be the center of the Studio's canvas area
+        // If desktop, sidebar is 320px on the right. 
+        // So canvas center is (windowWidth - 320) / 2
+        // IF we want it to land exactly where it renders in Studio.
+        let targetX = containerW / 2;
+        let targetY = containerH / 2; // Vertically centered
 
         const screenCenter = { left: window.innerWidth / 2, top: window.innerHeight / 2 }; // inspect spot
         const canvasCenter = { left: targetX, top: targetY }; // final spot
@@ -209,18 +212,16 @@ const Booth = () => {
                 y: canvasCenter.top - stripCenter.top
             };
 
-            const targetScale = Math.min(2.5, (window.innerHeight - 80) / 384);
-
             setStripAnimPath({
                 inspect: inspectDelta,
                 target: targetDelta,
-                targetScale
+                targetScale: layout.scale
             });
         }
 
         setIsStripAnimating(true);
-        // Wait for animation to finish (inspect -> target)
-        await new Promise(r => setTimeout(r, 2800));
+        // Animation duration is 2.5s. Wait for it to finish.
+        await new Promise(r => setTimeout(r, 2500));
     };
 
     return (
@@ -237,9 +238,9 @@ const Booth = () => {
                         rotate: [0, -5, 5, 0],
                         opacity: 1,
                         transition: {
-                            duration: 3.5,
-                            ease: ["backOut", "easeInOut", "backInOut"],
-                            times: [0, 0.25, 0.65, 1]
+                            duration: 2.5,
+                            ease: [0.4, 0, 0.2, 1],
+                            times: [0, 0.1, 0.5, 1]
                         }
                     } : {}}
                     transition={{ type: 'spring', stiffness: 120, damping: 18, mass: 1 }}

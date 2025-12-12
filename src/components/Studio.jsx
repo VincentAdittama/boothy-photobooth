@@ -4,6 +4,7 @@ import { useStore } from '../store';
 import { motion as Motion } from 'framer-motion';
 import URLImage from './URLImage';
 import { getStickers } from '../data/stickers';
+import { calculateStripLayout } from '../utils/stripLayout';
 
 const Studio = () => {
     const { capturedImage, setPhase, capturedImageIsMirrored, setCapturedImageIsMirrored, originalCapturedImageIsMirrored, capturedImages } = useStore();
@@ -38,28 +39,8 @@ const Studio = () => {
                 // padding: var(--strip-padding)
                 // gap: var(--strip-padding)
 
-                const REF_PHOTO_SIZE = 112;
-                const REF_BORDER = 4;
-                const PAD = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--strip-padding')) || 20;
-
-                // Total Reference Dimensions
-                const refW = REF_PHOTO_SIZE + (2 * PAD) + (2 * REF_BORDER);
-                const count = capturedImages.length;
-                const refH = (REF_PHOTO_SIZE * count) + ((count - 1) * PAD) + (2 * PAD) + (2 * REF_BORDER);
-
-                // Calculate Scale to fit container
-                const scaleX = width / refW;
-                const scaleY = height / refH;
-                const scale = Math.min(scaleX, scaleY) * 0.95; // 0.95 to leave a small margin
-
-                setLayout({
-                    width: refW * scale,
-                    height: refH * scale,
-                    photoSize: REF_PHOTO_SIZE * scale,
-                    pad: PAD * scale,
-                    border: REF_BORDER * scale,
-                    gap: PAD * scale
-                });
+                const calculated = calculateStripLayout(width, height, capturedImages.length);
+                setLayout(calculated);
 
             } else {
                 // Single square photo logic
