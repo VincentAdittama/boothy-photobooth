@@ -423,9 +423,6 @@ const Studio = () => {
                             Click photos to edit Live frames
                         </div>
                     )}
-                    {capturedImageIsMirrored && (
-                        <div className="text-xs text-right text-gray-400 mt-1">Mirrored image</div>
-                    )}
                 </div>
 
                 {/* Sticker Grid */}
@@ -449,9 +446,12 @@ const Studio = () => {
                 <div className="p-6 border-t border-gray-100 flex flex-col gap-3">
                     <button
                         onClick={() => setCapturedImageIsMirrored(!capturedImageIsMirrored)}
-                        className="w-full py-3 bg-white border-2 border-cute-pink text-cute-pink font-bold rounded-xl hover:bg-pink-50 transition-colors"
+                        className={`w-full py-3 font-bold rounded-xl transition-colors ${capturedImageIsMirrored
+                                ? 'bg-cute-pink text-white hover:bg-pink-400'
+                                : 'bg-white border-2 border-cute-pink text-cute-pink hover:bg-pink-50'
+                            }`}
                     >
-                        Flip Image
+                        {capturedImageIsMirrored ? '✓ Flipped' : 'Flip Image'}
                     </button>
                     <button
                         onClick={handleDownload}
