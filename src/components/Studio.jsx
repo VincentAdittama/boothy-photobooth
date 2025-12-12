@@ -15,6 +15,11 @@ const Studio = () => {
     // We need refs for all stickers to attach transformer
     const stickersRefs = useRef({});
 
+    // History for undo/redo (stores JSON snapshots of `stickers`)
+    const historyRef = useRef({ stack: [], index: -1 });
+    const isApplyingHistoryRef = useRef(false);
+    const MAX_HISTORY = 200;
+
     const [layout, setLayout] = useState({ width: 800, height: 800, photoSize: 0, pad: 0, gap: 0, border: 0 });
     const containerRef = useRef(null);
 
@@ -83,6 +88,79 @@ const Studio = () => {
             transformerRef.current.getLayer().batchDraw();
         }
     }, [selectedId, stickers]); // Re-run if stickers change (e.g. re-order or delete)
+
+    // Push current stickers to history (avoid when applying history)
+    const pushHistory = (state) => {
+        if (isApplyingHistoryRef.current) return;
+        const snap = JSON.stringify(state);
+        const stack = historyRef.current.stack;
+        const idx = historyRef.current.index;
+
+        // Avoid duplicate consecutive snapshots
+        if (stack.length > 0 && stack[idx] === snap) return;
+
+        // Trim any redo states
+        stack.splice(idx + 1);
+        stack.push(snap);
+        if (stack.length > MAX_HISTORY) {
+            stack.shift();
+        }
+        historyRef.current.index = stack.length - 1;
+    };
+
+    useEffect(() => {
+        pushHistory(stickers);
+    }, [stickers]);
+
+    const undo = () => {
+        const idx = historyRef.current.index;
+        if (idx > 0) {
+            isApplyingHistoryRef.current = true;
+            const prev = JSON.parse(historyRef.current.stack[idx - 1]);
+            historyRef.current.index = idx - 1;
+            selectShape(null);
+            setStickers(prev);
+            // Allow React to finish applying
+            setTimeout(() => (isApplyingHistoryRef.current = false), 0);
+        }
+    };
+
+    const redo = () => {
+        const idx = historyRef.current.index;
+        if (idx < historyRef.current.stack.length - 1) {
+            isApplyingHistoryRef.current = true;
+            const next = JSON.parse(historyRef.current.stack[idx + 1]);
+            historyRef.current.index = idx + 1;
+            selectShape(null);
+            setStickers(next);
+            setTimeout(() => (isApplyingHistoryRef.current = false), 0);
+        }
+    };
+
+    // Keyboard handlers for undo/redo (Cmd/Ctrl+Z, Shift+Cmd/Ctrl+Z or Cmd/Ctrl+Y)
+    useEffect(() => {
+        const onKeyDown = (e) => {
+            const meta = e.metaKey || e.ctrlKey;
+            if (!meta) return;
+
+            // Undo: Cmd/Ctrl + Z (without shift)
+            if ((e.key === 'z' || e.key === 'Z') && !e.shiftKey) {
+                e.preventDefault();
+                undo();
+                return;
+            }
+
+            // Redo: Cmd/Ctrl + Shift + Z OR Cmd/Ctrl + Y
+            if (((e.key === 'z' || e.key === 'Z') && e.shiftKey) || e.key === 'y' || e.key === 'Y') {
+                e.preventDefault();
+                redo();
+                return;
+            }
+        };
+
+        document.addEventListener('keydown', onKeyDown);
+        return () => document.removeEventListener('keydown', onKeyDown);
+    }, []);
 
     const checkDeselect = (e) => {
         const target = e.target;
