@@ -5,7 +5,7 @@ import { useStore } from '../store';
 import { uploadPhoto } from '../lib/supabase';
 import { calculateStripLayout } from '../utils/stripLayout';
 
-const Booth = () => {
+const Booth = ({ hideUI = false }) => {
     const webcamRef = useRef(null);
     const { setPhase, setCapturedImage, setCapturedImages, nickname, capturedImages, isMirrored, setIsMirrored, setCapturedImageIsMirrored, setOriginalCapturedImageIsMirrored, setIsFlashing, isFlashEnabled, setIsFlashEnabled, setIsCurtainOpen, setIsTransitioning } = useStore();
 
@@ -233,7 +233,7 @@ const Booth = () => {
 
     return (
         <div className="h-full w-full bg-black relative overflow-hidden flex flex-col items-center justify-center">
-            {/* Left-side preview strip (desktop only) */}
+            {/* Left-side preview strip (desktop only) - ALWAYS VISIBLE for animation */}
             <div className="hidden lg:flex absolute left-6 top-1/2 transform -translate-y-1/2 z-200">
                 <Motion.div
                     ref={stripRef}
@@ -288,114 +288,118 @@ const Booth = () => {
                     />
                 </Motion.div>
             </div>
-            {/* Camera Feed */}
-            <div className="relative w-full h-full max-w-[80vh] max-h-[80vh] rounded-3xl overflow-hidden shadow-2xl border-4 border-white/20">
-                <Webcam
-                    audio={false}
-                    ref={webcamRef}
-                    screenshotFormat="image/png"
-                    className="w-full h-full object-cover"
-                    mirrored={isMirrored}
-                    videoConstraints={{
-                        facingMode: "user",
-                        width: 720,
-                        height: 720
-                    }}
-                />
 
-                {/* Countdown Overlay */}
-                <AnimatePresence>
-                    {isCountingDown && (
-                        <Motion.div
-                            initial={{ scale: 0.5, opacity: 0 }}
-                            animate={{ scale: 1.5, opacity: 1 }}
-                            exit={{ scale: 2, opacity: 0 }}
-                            key={count}
-                            className="absolute inset-0 flex items-center justify-center z-20 pointer-events-none"
-                        >
-                            <span className="text-9xl font-black text-white drop-shadow-[0_4px_4px_rgba(0,0,0,0.5)]">
-                                {count}
-                            </span>
-                        </Motion.div>
-                    )}
-                </AnimatePresence>
+            {/* Main Booth UI - hidden during transition */}
+            <div className={`w-full h-full flex flex-col items-center justify-center transition-opacity duration-300 ${hideUI ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
+                {/* Camera Feed */}
+                <div className="relative w-full h-full max-w-[80vh] max-h-[80vh] rounded-3xl overflow-hidden shadow-2xl border-4 border-white/20">
+                    <Webcam
+                        audio={false}
+                        ref={webcamRef}
+                        screenshotFormat="image/png"
+                        className="w-full h-full object-cover"
+                        mirrored={isMirrored}
+                        videoConstraints={{
+                            facingMode: "user",
+                            width: 720,
+                            height: 720
+                        }}
+                    />
 
-                {/* Uploading Overlay */}
-                {isUploading && !isStripAnimating && (
-                    <div className="absolute inset-0 bg-black/50 z-40 flex items-center justify-center backdrop-blur-sm">
-                        <div className="flex flex-col items-center gap-4">
-                            <div className="w-12 h-12 border-4 border-white border-t-transparent rounded-full animate-spin" />
-                            <p className="text-white font-bold text-xl">Developing photo strip...</p>
+                    {/* Countdown Overlay */}
+                    <AnimatePresence>
+                        {isCountingDown && (
+                            <Motion.div
+                                initial={{ scale: 0.5, opacity: 0 }}
+                                animate={{ scale: 1.5, opacity: 1 }}
+                                exit={{ scale: 2, opacity: 0 }}
+                                key={count}
+                                className="absolute inset-0 flex items-center justify-center z-20 pointer-events-none"
+                            >
+                                <span className="text-9xl font-black text-white drop-shadow-[0_4px_4px_rgba(0,0,0,0.5)]">
+                                    {count}
+                                </span>
+                            </Motion.div>
+                        )}
+                    </AnimatePresence>
+
+                    {/* Uploading Overlay */}
+                    {isUploading && !isStripAnimating && (
+                        <div className="absolute inset-0 bg-black/50 z-40 flex items-center justify-center backdrop-blur-sm">
+                            <div className="flex flex-col items-center gap-4">
+                                <div className="w-12 h-12 border-4 border-white border-t-transparent rounded-full animate-spin" />
+                                <p className="text-white font-bold text-xl">Developing photo strip...</p>
+                            </div>
                         </div>
-                    </div>
-                )}
-            </div>
+                    )}
+                </div>
 
-            {/* center transition removed: using left preview -> center strip animation instead */}
+                {/* center transition removed: using left preview -> center strip animation instead */}
 
-            {/* Flying shot visuals (absolute images that animate to holes) */}
-            {flyingShots.map(f => (
-                <Motion.img
-                    key={f.id}
-                    src={f.src}
-                    initial={{ x: 0, y: 0, opacity: 1, rotate: 0 }}
-                    animate={{ x: f.deltaX, y: f.deltaY, scale: [1, 1.05, 0.6], rotate: [0, 8, -6], opacity: 1 }}
-                    transition={{ duration: 0.9, ease: 'easeInOut' }}
-                    style={{ position: 'absolute', left: f.initLeft - 60, top: f.initTop - 80, width: 120, height: 160 }}
-                    className="rounded-md shadow-2xl z-50 pointer-events-none border-2 border-white/20 object-cover"
-                />
-            ))}
+                {/* Flying shot visuals (absolute images that animate to holes) */}
+                {flyingShots.map(f => (
+                    <Motion.img
+                        key={f.id}
+                        src={f.src}
+                        initial={{ x: 0, y: 0, opacity: 1, rotate: 0 }}
+                        animate={{ x: f.deltaX, y: f.deltaY, scale: [1, 1.05, 0.6], rotate: [0, 8, -6], opacity: 1 }}
+                        transition={{ duration: 0.9, ease: 'easeInOut' }}
+                        style={{ position: 'absolute', left: f.initLeft - 60, top: f.initTop - 80, width: 120, height: 160 }}
+                        className="rounded-md shadow-2xl z-50 pointer-events-none border-2 border-white/20 object-cover"
+                    />
+                ))}
 
-            {/* Controls */}
-            <div className="absolute bottom-8 left-0 right-0 flex justify-center items-center gap-8 z-10">
-                {!isCountingDown && !isUploading && !isStripAnimating && (
-                    <>
-                        <Motion.button
-                            whileHover={{ scale: 1.1 }}
-                            whileTap={{ scale: 0.9 }}
-                            onClick={() => setIsMirrored(!isMirrored)}
-                            className={`w-16 h-16 backdrop-blur-md rounded-full border-2 border-white/50 flex items-center justify-center group ${isMirrored ? 'bg-blue-400/20' : 'bg-white/20'}`}
-                            title={isMirrored ? "Turn Mirroring Off" : "Turn Mirroring On"}
-                        >
-                            {/* Simple icon for mirror toggle */}
-                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={`w-8 h-8 ${isMirrored ? 'text-blue-400' : 'text-white'}`}>
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 21 3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5" />
-                            </svg>
-                        </Motion.button>
+                {/* Controls */}
+                <div className="absolute bottom-8 left-0 right-0 flex justify-center items-center gap-8 z-10">
+                    {!isCountingDown && !isUploading && !isStripAnimating && (
+                        <>
+                            <Motion.button
+                                whileHover={{ scale: 1.1 }}
+                                whileTap={{ scale: 0.9 }}
+                                onClick={() => setIsMirrored(!isMirrored)}
+                                className={`w-16 h-16 backdrop-blur-md rounded-full border-2 border-white/50 flex items-center justify-center group ${isMirrored ? 'bg-blue-400/20' : 'bg-white/20'}`}
+                                title={isMirrored ? "Turn Mirroring Off" : "Turn Mirroring On"}
+                            >
+                                {/* Simple icon for mirror toggle */}
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={`w-8 h-8 ${isMirrored ? 'text-blue-400' : 'text-white'}`}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 21 3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5" />
+                                </svg>
+                            </Motion.button>
 
-                        <Motion.button
-                            whileHover={{ scale: 1.1 }}
-                            whileTap={{ scale: 0.9 }}
-                            onClick={() => setIsFlashEnabled(!isFlashEnabled)}
-                            className={`w-16 h-16 backdrop-blur-md rounded-full border-2 border-white/50 flex items-center justify-center group ${isFlashEnabled ? 'bg-yellow-400/20' : 'bg-white/20'}`}
-                            title={isFlashEnabled ? "Turn Flash Off" : "Turn Flash On"}
-                        >
-                            {/* Lightning bolt icon for flash */}
-                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={`w-8 h-8 ${isFlashEnabled ? 'text-yellow-400' : 'text-white'}`}>
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" />
-                            </svg>
-                        </Motion.button>
+                            <Motion.button
+                                whileHover={{ scale: 1.1 }}
+                                whileTap={{ scale: 0.9 }}
+                                onClick={() => setIsFlashEnabled(!isFlashEnabled)}
+                                className={`w-16 h-16 backdrop-blur-md rounded-full border-2 border-white/50 flex items-center justify-center group ${isFlashEnabled ? 'bg-yellow-400/20' : 'bg-white/20'}`}
+                                title={isFlashEnabled ? "Turn Flash Off" : "Turn Flash On"}
+                            >
+                                {/* Lightning bolt icon for flash */}
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={`w-8 h-8 ${isFlashEnabled ? 'text-yellow-400' : 'text-white'}`}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" />
+                                </svg>
+                            </Motion.button>
 
-                        {/* Export is always WYSIWYG (no toggle) - the preview equals exported image */}
+                            {/* Export is always WYSIWYG (no toggle) - the preview equals exported image */}
 
-                        <Motion.button
-                            whileHover={{ scale: 1.1 }}
-                            whileTap={{ scale: 0.9 }}
-                            onClick={handleStartCapture}
-                            className="w-20 h-20 bg-white rounded-full border-4 border-gray-200 shadow-xl flex items-center justify-center group"
-                        >
-                            <div className="w-16 h-16 bg-cute-pink rounded-full group-hover:bg-pink-400 transition-colors" />
-                        </Motion.button>
+                            <Motion.button
+                                whileHover={{ scale: 1.1 }}
+                                whileTap={{ scale: 0.9 }}
+                                onClick={handleStartCapture}
+                                className="w-20 h-20 bg-white rounded-full border-4 border-gray-200 shadow-xl flex items-center justify-center group"
+                            >
+                                <div className="w-16 h-16 bg-cute-pink rounded-full group-hover:bg-pink-400 transition-colors" />
+                            </Motion.button>
 
-                        {/* Spacer to balance the layout */}
-                        <div className="w-16 h-16" />
-                    </>
-                )}
-            </div>
+                            {/* Spacer to balance the layout */}
+                            <div className="w-16 h-16" />
+                        </>
+                    )}
+                </div>
 
-            {/* Decorative */}
-            <div className="absolute top-4 left-4 text-white/50 font-mono text-sm">
-                LOGGED IN AS: {nickname}
+                {/* Decorative */}
+                <div className="absolute top-4 left-4 text-white/50 font-mono text-sm">
+                    LOGGED IN AS: {nickname}
+                </div>
             </div>
         </div>
     );

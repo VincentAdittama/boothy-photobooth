@@ -24,11 +24,9 @@ function App() {
         <div className={
           currentPhase === 'STORY'
             ? "fixed inset-0 opacity-0 pointer-events-none -z-50"
-            : isTransitioning
-              ? "h-full w-full opacity-0 pointer-events-none z-0"
-              : "h-full w-full"
+            : "h-full w-full"
         }>
-          <Booth />
+          <Booth hideUI={isTransitioning} />
         </div>
       )}
 
