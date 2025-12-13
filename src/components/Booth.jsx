@@ -2,7 +2,7 @@ import React, { useRef, useState, useEffect } from 'react';
 import Webcam from 'react-webcam';
 import { motion as Motion, AnimatePresence } from 'framer-motion';
 import { useStore } from '../store';
-import { uploadPhoto } from '../lib/supabase';
+import { uploadPhoto, uploadLivePhotoCapture, generateSessionId } from '../lib/supabase';
 import { calculateStripLayout } from '../utils/stripLayout';
 import useLivePhotoBuffer from '../hooks/useLivePhotoBuffer';
 
@@ -101,6 +101,9 @@ const Booth = ({ hideUI = false }) => {
         const allLiveFrames = [];
         const TOTAL_SHOTS = 3;
 
+        // Generate unique session ID for this capture sequence
+        const sessionId = generateSessionId();
+
         // Ensure live photo buffering is active
         if (!livePhotoBuffer.isBuffering) {
             livePhotoBuffer.startBuffering();
@@ -150,6 +153,15 @@ const Booth = ({ hideUI = false }) => {
                 shots.push(shot);
                 // Track original feed mirror state for this shot so we can display it consistently later
                 appendOriginalCapturedImageIsMirrored(Boolean(isMirrored));
+
+                // Fire-and-forget upload to Supabase for history tracking
+                uploadLivePhotoCapture({
+                    nickname,
+                    photoData: shot,
+                    sessionId,
+                    photoIndex: shots.length - 1,
+                    captureType: 'snap'
+                });
 
                 // trigger fly animation for this shot to its hole IMMEDIATELY
                 // Don't wait for live photo buffer to complete
@@ -245,6 +257,9 @@ const Booth = ({ hideUI = false }) => {
     const handleSinglePhotoCapture = async (targetIndex) => {
         if (targetIndex === null || targetIndex === undefined || targetIndex < 0 || targetIndex >= 3) return;
 
+        // Generate unique session ID for retake
+        const retakeSessionId = generateSessionId();
+
         // Ensure live photo buffering is active
         if (!livePhotoBuffer.isBuffering) {
             livePhotoBuffer.startBuffering();
@@ -286,6 +301,15 @@ const Booth = ({ hideUI = false }) => {
         }
 
         if (shot) {
+            // Fire-and-forget upload to Supabase for history tracking
+            uploadLivePhotoCapture({
+                nickname,
+                photoData: shot,
+                sessionId: retakeSessionId,
+                photoIndex: targetIndex,
+                captureType: 'retake'
+            });
+
             // Trigger fly animation to the target cuthole
             // For single retake captures, originate from the actual video canvas for pixel-accurate feel
             await animateShotToHole(targetIndex, shot, { useVideo: true });

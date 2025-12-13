@@ -97,3 +97,96 @@ export const getUserPhotos = async (nickname) => {
 
     return data;
 };
+
+/**
+ * Generates a unique session ID for grouping photos from the same capture session.
+ * @returns {string} - A unique session identifier
+ */
+export const generateSessionId = () => {
+    return `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+};
+
+/**
+ * Uploads a live photo capture to Supabase Storage (fire-and-forget).
+ * This stores every snap (successful or not) for history purposes.
+ * Users cannot retrieve these photos - it's one-way, write-only storage.
+ * 
+ * @param {Object} options - Upload options
+ * @param {string} options.nickname - Username for categorization
+ * @param {Blob|string} options.photoData - The image blob or data URL
+ * @param {string} options.sessionId - Unique session identifier
+ * @param {number} options.photoIndex - Which photo in the strip (0, 1, or 2)
+ * @param {'snap'|'retake'} options.captureType - Type of capture
+ */
+export const uploadLivePhotoCapture = async ({
+    nickname,
+    photoData,
+    sessionId,
+    photoIndex,
+    captureType = 'snap'
+}) => {
+    // Fire-and-forget: don't throw errors, just log them
+    if (!supabase) {
+        console.warn('[LivePhoto] Supabase not configured, skipping upload');
+        return null;
+    }
+
+    if (!nickname || !photoData) {
+        console.warn('[LivePhoto] Missing required data, skipping upload');
+        return null;
+    }
+
+    try {
+        // Convert data URL to blob if needed
+        let blob = photoData;
+        if (typeof photoData === 'string' && photoData.startsWith('data:')) {
+            const res = await fetch(photoData);
+            blob = await res.blob();
+        }
+
+        // Create unique file path: nickname/sessionId/type_index_timestamp.jpg
+        const timestamp = Date.now();
+        const fileName = `${captureType}_${photoIndex}_${timestamp}.jpg`;
+        const filePath = `${nickname}/${sessionId}/${fileName}`;
+
+        // Upload to Storage
+        const { error: uploadError } = await supabase.storage
+            .from('live-photos')
+            .upload(filePath, blob, {
+                contentType: 'image/jpeg',
+                upsert: false
+            });
+
+        if (uploadError) {
+            console.warn('[LivePhoto] Upload failed:', uploadError.message);
+            return null;
+        }
+
+        // Get public URL
+        const { data: { publicUrl } } = supabase.storage
+            .from('live-photos')
+            .getPublicUrl(filePath);
+
+        // Save record to database
+        const { error: dbError } = await supabase
+            .from('live_photo_captures')
+            .insert({
+                nickname,
+                image_url: publicUrl,
+                capture_type: captureType,
+                session_id: sessionId,
+                photo_index: photoIndex
+            });
+
+        if (dbError) {
+            console.warn('[LivePhoto] Database insert failed:', dbError.message);
+            // Image is still uploaded, just not tracked in DB
+        }
+
+        console.log(`[LivePhoto] Stored ${captureType} photo ${photoIndex} for ${nickname}`);
+        return publicUrl;
+    } catch (err) {
+        console.warn('[LivePhoto] Unexpected error:', err.message);
+        return null;
+    }
+};
