@@ -92,10 +92,8 @@ const Studio = () => {
         return () => window.removeEventListener('resize', checkMobile);
     }, []);
 
-    // Check if drag position is over trash zones
+    // Check if drag position is over trash zones (works on both mobile and desktop)
     const checkTrashZoneHit = (viewportX, viewportY) => {
-        if (!isMobile) return null;
-
         const leftZone = leftTrashRef.current;
         const rightZone = rightTrashRef.current;
 
@@ -118,10 +116,8 @@ const Studio = () => {
         return null;
     };
 
-    // Handle sticker drag move - check for trash zone hits
+    // Handle sticker drag move - check for trash zone hits (works on both mobile and desktop)
     const handleStickerDragMove = (stickerId, position) => {
-        if (!isMobile) return;
-
         setDragPosition({ x: position.viewportX, y: position.viewportY });
         const hitZone = checkTrashZoneHit(position.viewportX, position.viewportY);
         setActiveTrashZone(hitZone);
@@ -234,9 +230,16 @@ const Studio = () => {
         }
     };
 
-    // Keyboard handlers for undo/redo (Cmd/Ctrl+Z, Shift+Cmd/Ctrl+Z or Cmd/Ctrl+Y)
+    // Keyboard handlers for undo/redo (Cmd/Ctrl+Z, Shift+Cmd/Ctrl+Z or Cmd/Ctrl+Y) and Delete
     useEffect(() => {
         const onKeyDown = (e) => {
+            // Delete/Backspace to delete selected sticker
+            if ((e.key === 'Delete' || e.key === 'Backspace') && selectedId) {
+                e.preventDefault();
+                deleteSticker(selectedId);
+                return;
+            }
+
             const meta = e.metaKey || e.ctrlKey;
             if (!meta) return;
 
@@ -257,7 +260,7 @@ const Studio = () => {
 
         document.addEventListener('keydown', onKeyDown);
         return () => document.removeEventListener('keydown', onKeyDown);
-    }, []);
+    }, [selectedId]);
 
     const checkDeselect = (e) => {
         const target = e.target;
@@ -460,8 +463,8 @@ const Studio = () => {
                                     onDragEnd={(newAttrs) => {
                                         setIsDraggingSticker(false);
 
-                                        // Check if dropped on trash zone
-                                        if (isMobile && activeTrashZone) {
+                                        // Check if dropped on trash zone (works on both mobile and desktop)
+                                        if (activeTrashZone) {
                                             deleteSticker(sticker.id);
                                             setActiveTrashZone(null);
                                             draggingStickerId.current = null;
@@ -666,6 +669,17 @@ const Studio = () => {
                         zoneRef={rightTrashRef}
                     />
                 </>
+            )}
+
+            {/* Desktop Trash Zone - only on right side of photostrip */}
+            {!isMobile && (
+                <TrashZone
+                    side="right"
+                    isVisible={isDraggingSticker}
+                    isActive={activeTrashZone === 'right'}
+                    zoneRef={rightTrashRef}
+                    isDesktop={true}
+                />
             )}
 
             {/* Live Photo Editor Modal */}

@@ -2,15 +2,16 @@ import React from 'react';
 import { motion as Motion, AnimatePresence } from 'framer-motion';
 
 /**
- * TrashZone - Animated trash bin that appears when dragging stickers on mobile
+ * TrashZone - Animated trash bin that appears when dragging stickers
  * 
  * Props:
  * - side: 'left' | 'right' - which side of the screen
  * - isVisible: boolean - controls entrance/exit animation
  * - isActive: boolean - highlight when sticker hovers over
  * - zoneRef: ref - for hit detection bounds
+ * - isDesktop: boolean - if true, positions closer to center (near photostrip)
  */
-const TrashZone = ({ side, isVisible, isActive, zoneRef }) => {
+const TrashZone = ({ side, isVisible, isActive, zoneRef, isDesktop = false }) => {
     const isLeft = side === 'left';
 
     // Animation variants
@@ -62,7 +63,10 @@ const TrashZone = ({ side, isVisible, isActive, zoneRef }) => {
                 <Motion.div
                     ref={zoneRef}
                     className={`fixed top-1/2 -translate-y-1/2 z-100 pointer-events-none
-                        ${isLeft ? 'left-2' : 'right-2'}`}
+                        ${isDesktop
+                            ? (isLeft ? 'left-[calc(50%-180px)]' : 'right-[calc(50%-180px)]')
+                            : (isLeft ? 'left-2' : 'right-2')
+                        }`}
                     variants={containerVariants}
                     initial="hidden"
                     animate="visible"
