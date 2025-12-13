@@ -6,6 +6,7 @@ import URLImage from './URLImage';
 import { getStickers } from '../data/stickers';
 import { calculateStripLayout } from '../utils/stripLayout';
 import LivePhotoEditor from './LivePhotoEditor';
+import TrashZone from './TrashZone';
 
 const Studio = () => {
     const {
@@ -41,6 +42,16 @@ const Studio = () => {
     const [isHoveringSticker, setIsHoveringSticker] = useState(false);
     const [isDraggingSticker, setIsDraggingSticker] = useState(false);
 
+    // Mobile detection for trash zones
+    const [isMobile, setIsMobile] = useState(false);
+
+    // Trash zone refs and state for mobile drag-to-delete
+    const leftTrashRef = useRef(null);
+    const rightTrashRef = useRef(null);
+    const [activeTrashZone, setActiveTrashZone] = useState(null); // 'left' | 'right' | null
+    const [dragPosition, setDragPosition] = useState({ x: 0, y: 0 });
+    const draggingStickerId = useRef(null);
+
     // Hit detection to manage z-index interaction between stickers (canvas) and DOM overlays
     useEffect(() => {
         const handleMouseMove = (e) => {
@@ -72,6 +83,55 @@ const Studio = () => {
         window.addEventListener('mousemove', handleMouseMove);
         return () => window.removeEventListener('mousemove', handleMouseMove);
     }, [layout.width, layout.height]);
+
+    // Mobile detection
+    useEffect(() => {
+        const checkMobile = () => setIsMobile(window.innerWidth < 768);
+        checkMobile();
+        window.addEventListener('resize', checkMobile);
+        return () => window.removeEventListener('resize', checkMobile);
+    }, []);
+
+    // Check if drag position is over trash zones
+    const checkTrashZoneHit = (viewportX, viewportY) => {
+        if (!isMobile) return null;
+
+        const leftZone = leftTrashRef.current;
+        const rightZone = rightTrashRef.current;
+
+        if (leftZone) {
+            const rect = leftZone.getBoundingClientRect();
+            if (viewportX >= rect.left && viewportX <= rect.right &&
+                viewportY >= rect.top && viewportY <= rect.bottom) {
+                return 'left';
+            }
+        }
+
+        if (rightZone) {
+            const rect = rightZone.getBoundingClientRect();
+            if (viewportX >= rect.left && viewportX <= rect.right &&
+                viewportY >= rect.top && viewportY <= rect.bottom) {
+                return 'right';
+            }
+        }
+
+        return null;
+    };
+
+    // Handle sticker drag move - check for trash zone hits
+    const handleStickerDragMove = (stickerId, position) => {
+        if (!isMobile) return;
+
+        setDragPosition({ x: position.viewportX, y: position.viewportY });
+        const hitZone = checkTrashZoneHit(position.viewportX, position.viewportY);
+        setActiveTrashZone(hitZone);
+    };
+
+    // Delete sticker by id
+    const deleteSticker = (id) => {
+        setStickers(prev => prev.filter(s => s.id !== id));
+        selectShape(null);
+    };
 
     // Recalculate layout on mount and resize
     useEffect(() => {
@@ -390,12 +450,30 @@ const Studio = () => {
                                     }}
                                     isSelected={sticker.id === selectedId}
                                     onSelect={() => selectShape(sticker.id)}
-                                    onDragStart={() => setIsDraggingSticker(true)}
+                                    onDragStart={() => {
+                                        setIsDraggingSticker(true);
+                                        draggingStickerId.current = sticker.id;
+                                    }}
+                                    onDragMove={(position) => {
+                                        handleStickerDragMove(sticker.id, position);
+                                    }}
                                     onDragEnd={(newAttrs) => {
                                         setIsDraggingSticker(false);
+
+                                        // Check if dropped on trash zone
+                                        if (isMobile && activeTrashZone) {
+                                            deleteSticker(sticker.id);
+                                            setActiveTrashZone(null);
+                                            draggingStickerId.current = null;
+                                            return;
+                                        }
+
+                                        // Normal drop - update position
                                         const slice = stickers.slice();
                                         slice[i] = newAttrs;
                                         setStickers(slice);
+                                        setActiveTrashZone(null);
+                                        draggingStickerId.current = null;
                                     }}
                                     onChange={(newAttrs) => {
                                         const slice = stickers.slice();
@@ -571,6 +649,24 @@ const Studio = () => {
                     </button>
                 </div>
             </Motion.div>
+
+            {/* Mobile Trash Zones - appear when dragging stickers */}
+            {isMobile && (
+                <>
+                    <TrashZone
+                        side="left"
+                        isVisible={isDraggingSticker}
+                        isActive={activeTrashZone === 'left'}
+                        zoneRef={leftTrashRef}
+                    />
+                    <TrashZone
+                        side="right"
+                        isVisible={isDraggingSticker}
+                        isActive={activeTrashZone === 'right'}
+                        zoneRef={rightTrashRef}
+                    />
+                </>
+            )}
 
             {/* Live Photo Editor Modal */}
             <AnimatePresence>

@@ -3,7 +3,7 @@ import { Image as KonvaImage } from 'react-konva';
 import useImage from 'use-image';
 
 // URLImage component for loading images on canvas
-const URLImage = ({ src, isBackground = false, onSelect, onChange, onDragStart, onDragEnd, shapeRef, ...props }) => {
+const URLImage = ({ src, isBackground = false, onSelect, onChange, onDragStart, onDragMove, onDragEnd, shapeRef, ...props }) => {
     const [image] = useImage(src, 'anonymous');
 
     // If it's the background, we want it to fill the stage or fit nicely
@@ -50,6 +50,21 @@ const URLImage = ({ src, isBackground = false, onSelect, onChange, onDragStart, 
             onDragStart={() => {
                 if (!isBackground && onDragStart) {
                     onDragStart();
+                }
+            }}
+            onDragMove={(e) => {
+                if (!isBackground && onDragMove) {
+                    // Get viewport position for hit detection outside canvas
+                    const stage = e.target.getStage();
+                    const pointerPos = stage.getPointerPosition();
+                    const container = stage.container();
+                    const rect = container.getBoundingClientRect();
+
+                    // Convert to viewport coordinates
+                    const viewportX = rect.left + pointerPos.x;
+                    const viewportY = rect.top + pointerPos.y;
+
+                    onDragMove({ viewportX, viewportY, stageX: pointerPos.x, stageY: pointerPos.y });
                 }
             }}
             onDragEnd={(e) => {
