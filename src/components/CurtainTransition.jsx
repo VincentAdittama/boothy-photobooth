@@ -11,11 +11,12 @@ const CurtainTransition = () => {
     };
 
     return (
-        <div className="fixed inset-0 pointer-events-none z-100 flex">
+        <div className="fixed inset-0 pointer-events-none z-100 flex overflow-hidden">
             {/* Left Curtain */}
             <motion.div
                 initial={{ x: '-100%' }}
-                animate={{ x: isCurtainOpen ? '-100%' : '0%' }}
+                // Overshoot slightly to avoid sub-pixel gaps on mobile
+                animate={{ x: isCurtainOpen ? '-110%' : '0%' }}
                 transition={transition}
                 className="w-1/2 h-full bg-[#E63946] border-r-4 border-[#333]/20 relative"
             >
@@ -27,7 +28,8 @@ const CurtainTransition = () => {
             {/* Right Curtain */}
             <motion.div
                 initial={{ x: '100%' }}
-                animate={{ x: isCurtainOpen ? '100%' : '0%' }}
+                // Overshoot slightly to avoid sub-pixel gaps on mobile
+                animate={{ x: isCurtainOpen ? '110%' : '0%' }}
                 transition={transition}
                 className="w-1/2 h-full bg-[#E63946] border-l-4 border-[#333]/20 relative"
             >
