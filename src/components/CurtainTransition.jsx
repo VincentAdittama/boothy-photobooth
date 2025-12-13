@@ -17,7 +17,7 @@ const CurtainTransition = () => {
                 initial={{ x: '-100%' }}
                 animate={{ x: isCurtainOpen ? '-100%' : '0%' }}
                 transition={transition}
-                className="w-1/2 h-full bg-[#E63946] border-r-4 border-[#333]/20 relative shadow-[10px_0_30px_rgba(0,0,0,0.5)]"
+                className="w-1/2 h-full bg-[#E63946] border-r-4 border-[#333]/20 relative"
             >
                 {/* Fabric Texture/Fold gradients */}
                 <div className="absolute inset-0 bg-linear-to-r from-black/20 via-transparent to-black/20 opacity-50" />
@@ -29,7 +29,7 @@ const CurtainTransition = () => {
                 initial={{ x: '100%' }}
                 animate={{ x: isCurtainOpen ? '100%' : '0%' }}
                 transition={transition}
-                className="w-1/2 h-full bg-[#E63946] border-l-4 border-[#333]/20 relative shadow-[-10px_0_30px_rgba(0,0,0,0.5)]"
+                className="w-1/2 h-full bg-[#E63946] border-l-4 border-[#333]/20 relative"
             >
                 {/* Fabric Texture/Fold gradients */}
                 <div className="absolute inset-0 bg-linear-to-r from-black/20 via-transparent to-black/20 opacity-50" />
