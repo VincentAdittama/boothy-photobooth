@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { motion as Motion } from 'framer-motion';
+import React, { useState, useMemo } from 'react';
+import { motion as Motion, AnimatePresence } from 'framer-motion';
 import { useStore } from '../store';
 import { useMousePhysics } from '../hooks/useMousePhysics';
 import { getStickers } from '../data/stickers';
@@ -78,7 +78,78 @@ const Login = () => {
                         </div>
 
                         {/* Hero Sticker Area */}
-                        <div className="flex-1 flex items-end justify-center w-full mt-4 min-h-0">
+                        <div className="flex-1 flex flex-col items-center justify-center w-full mt-4 min-h-0 relative">
+                            {/* Mobile Persistent Sign - Always visible on mobile, overlapping sticker */}
+                            <div className="md:hidden absolute inset-0 flex items-center justify-center z-20 pointer-events-none">
+                                <Motion.div
+                                    initial={{ opacity: 0, scale: 0.8, y: -20 }}
+                                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                                    transition={{ type: 'spring', stiffness: 200, damping: 20 }}
+                                    onClick={() => {
+                                        if (inputValue.trim().length >= 3) {
+                                            handleLogin({ preventDefault: () => { } });
+                                        }
+                                    }}
+                                    className={`pointer-events-auto ${inputValue.trim().length >= 3 ? 'cursor-pointer' : 'cursor-not-allowed'}`}
+                                    style={{ filter: 'drop-shadow(0px 10px 10px rgba(0,0,0,0.2))' }}
+                                >
+                                    <Motion.div
+                                        animate={{
+                                            y: [-3, 3, -3],
+                                            rotate: [-2, 2, -2]
+                                        }}
+                                        transition={{
+                                            duration: 2,
+                                            repeat: Infinity,
+                                            ease: "easeInOut"
+                                        }}
+                                        className="relative flex flex-col items-center"
+                                    >
+                                        <Motion.div
+                                            className={`relative w-full text-center border-4 rounded-lg px-6 py-3 text-white font-black text-lg shadow-inner ${inputValue.trim().length >= 3
+                                                ? 'bg-amber-700 border-amber-900'
+                                                : inputValue.trim().length > 0
+                                                    ? 'bg-amber-600 border-amber-800'
+                                                    : 'bg-amber-500 border-amber-700'
+                                                }`}
+                                            animate={{ scale: inputValue.trim().length >= 3 ? [1, 1.02, 1] : 1 }}
+                                            transition={{ duration: 0.5, repeat: inputValue.trim().length >= 3 ? Infinity : 0, repeatDelay: 1 }}
+                                        >
+                                            <div className="absolute inset-0 border-2 border-[#ffffff20] rounded-lg pointer-events-none"></div>
+
+                                            {/* Text with instant pop on change */}
+                                            <Motion.span
+                                                key={inputValue.trim().length === 0 ? 'empty' : inputValue.trim().length < 3 ? 'typing' : 'ready'}
+                                                initial={{ scale: 0.9 }}
+                                                animate={{ scale: 1 }}
+                                                transition={{ type: 'spring', stiffness: 600, damping: 15 }}
+                                                className="block"
+                                            >
+                                                {inputValue.trim().length === 0 && "TYPE YOUR NAME!"}
+                                                {inputValue.trim().length >= 1 && inputValue.trim().length < 3 && "KEEP TYPING..."}
+                                                {inputValue.trim().length >= 3 && "TAP TO ENTER BOOTHY"}
+                                            </Motion.span>
+
+                                            {/* little nails */}
+                                            <span className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-amber-950 shadow-sm border border-amber-800" />
+                                            <span className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-amber-950 shadow-sm border border-amber-800" />
+                                        </Motion.div>
+
+                                        {/* The Stick */}
+                                        <div
+                                            style={{
+                                                width: 14,
+                                                height: 60,
+                                                background: 'linear-gradient(90deg, #3E2723 0%, #5D4037 45%, #795548 50%, #5D4037 55%, #3E2723 100%)',
+                                                borderRadius: '0 0 10px 10px',
+                                                marginTop: -5,
+                                                zIndex: -1
+                                            }}
+                                        />
+                                    </Motion.div>
+                                </Motion.div>
+                            </div>
+
                             {/* Placeholder for the large sticker in the design */}
                             <Motion.div
                                 whileHover={{ scale: 1.05 }}
@@ -128,9 +199,24 @@ const Login = () => {
                                             }}
                                             className="relative flex flex-col items-center pointer-events-none"
                                         >
-                                            <div className="relative w-full text-center bg-amber-700 border-4 border-amber-900 rounded-lg px-4 py-2 text-white font-black text-sm shadow-inner transform -translate-y-1">
+                                            <div className={`relative w-full text-center border-4 rounded-lg px-4 py-2 text-white font-black text-sm shadow-inner transform -translate-y-1 ${inputValue.trim().length >= 3
+                                                    ? 'bg-amber-700 border-amber-900'
+                                                    : inputValue.trim().length > 0
+                                                        ? 'bg-amber-600 border-amber-800'
+                                                        : 'bg-amber-500 border-amber-700'
+                                                }`}>
                                                 <div className="absolute inset-0 border-2 border-[#ffffff20] rounded-lg pointer-events-none"></div>
-                                                ENTER BOOTHY
+                                                <Motion.span
+                                                    key={inputValue.trim().length === 0 ? 'empty' : inputValue.trim().length < 3 ? 'typing' : 'ready'}
+                                                    initial={{ scale: 0.9 }}
+                                                    animate={{ scale: 1 }}
+                                                    transition={{ type: 'spring', stiffness: 600, damping: 15 }}
+                                                    className="block"
+                                                >
+                                                    {inputValue.trim().length === 0 && "TYPE YOUR NAME!"}
+                                                    {inputValue.trim().length >= 1 && inputValue.trim().length < 3 && "KEEP TYPING..."}
+                                                    {inputValue.trim().length >= 3 && "TAP TO ENTER BOOTHY"}
+                                                </Motion.span>
                                                 {/* little nails */}
                                                 <span className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-amber-950 shadow-sm border border-amber-800" />
                                                 <span className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-amber-950 shadow-sm border border-amber-800" />
