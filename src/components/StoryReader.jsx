@@ -84,7 +84,7 @@ const StoryReader = () => {
 
         let timeout;
         if (currentChapter && currentChapter.delay) {
-            const delay = (isLastChapter && currentChapter.delay < 3500) ? 3500 : currentChapter.delay;
+            const delay = (isLastChapter && currentChapter.delay < 1750) ? 1750 : currentChapter.delay;
 
             timeout = setTimeout(() => {
                 if (isLastChapter) {
