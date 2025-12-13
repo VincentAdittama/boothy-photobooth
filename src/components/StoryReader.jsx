@@ -17,12 +17,11 @@ const StoryReader = () => {
         } else {
             setIsCameraPreloading(false);
         }
-        // Cleanup on unmount (or when leaving story phase) to be safe, though App.jsx handles it
         return () => setIsCameraPreloading(false);
     }, [chapterIndex, story.chapters.length, setIsCameraPreloading]);
 
-    // State to track if user has manually interacted (halts auto-advance)
-    const [isPaused, setIsPaused] = useState(false);
+    // Active hold state (pauses auto-advance while true)
+    const [isHolding, setIsHolding] = useState(false);
 
     // Blocking state for last chapter to ensure camera loads
     const [canAdvanceFromLast, setCanAdvanceFromLast] = useState(false);
@@ -33,15 +32,13 @@ const StoryReader = () => {
         let allowTimer;
 
         if (isLastChapter) {
-            // Avoid calling setState synchronously inside the effect body by deferring
             setFalseTimer = setTimeout(() => setCanAdvanceFromLast(false), 0);
-            allowTimer = setTimeout(() => setCanAdvanceFromLast(true), 1500); // minimal wait for camera
+            allowTimer = setTimeout(() => setCanAdvanceFromLast(true), 1500);
             return () => {
                 clearTimeout(setFalseTimer);
                 clearTimeout(allowTimer);
             };
         } else {
-            // Defer to avoid synchronous setState in effect
             setFalseTimer = setTimeout(() => setCanAdvanceFromLast(true), 0);
             return () => clearTimeout(setFalseTimer);
         }
@@ -49,20 +46,17 @@ const StoryReader = () => {
 
     const handleNext = React.useCallback((e) => {
         e?.stopPropagation();
-        setIsPaused(true); // User took control
 
         if (chapterIndex < story.chapters.length - 1) {
             setChapterIndex((prev) => prev + 1);
         } else {
-            // Attempting to go to booth
-            if (isLastChapter && !canAdvanceFromLast) return; // Block if too soon
+            if (isLastChapter && !canAdvanceFromLast) return;
             setPhase('BOOTH');
         }
     }, [chapterIndex, isLastChapter, canAdvanceFromLast, setPhase, story.chapters.length]);
 
     const handleBack = React.useCallback((e) => {
         e?.stopPropagation();
-        setIsPaused(true); // User took control
         if (chapterIndex > 0) {
             setChapterIndex((prev) => prev - 1);
         }
@@ -81,42 +75,36 @@ const StoryReader = () => {
         };
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [chapterIndex, isLastChapter, canAdvanceFromLast, handleNext, handleBack]); // Re-bind with latest state
+    }, [handleNext, handleBack]);
 
+    // Auto-advance logic
     useEffect(() => {
-        // Auto-advance to next chapter after delay
-        // For the last chapter, we auto-advance to BOOTH after the delay AND camera is ready
-        let timeout;
+        // Do not set timer if holding
+        if (isHolding && !isLastChapter) return;
 
+        let timeout;
         if (currentChapter && currentChapter.delay) {
-            // For the last chapter, ensure minimum delay for camera warmup (at least 3500ms)
-            // This happens automatically regardless of user interaction (no isPaused check for last chapter)
             const delay = (isLastChapter && currentChapter.delay < 3500) ? 3500 : currentChapter.delay;
 
             timeout = setTimeout(() => {
                 if (isLastChapter) {
-                    // Last chapter: auto-advance to BOOTH after delay
-                    // The camera should be preloaded by now since we set isPreloading on last chapter
                     setPhase('BOOTH');
-                } else if (!isPaused) {
-                    // Non-last chapters: only auto-advance if user hasn't paused
+                } else {
                     setChapterIndex((prev) => prev + 1);
                 }
             }, delay);
         }
         return () => clearTimeout(timeout);
-    }, [chapterIndex, currentChapter, isPaused, isLastChapter, setPhase, story.chapters.length]);
+    }, [chapterIndex, currentChapter, isHolding, isLastChapter, setPhase]);
 
-    // Parse text to replace variables
+    // Parse text
     const displayText = currentChapter.text.replace(/{nickname}/g, nickname);
 
-    // Detect touch device
+    // Mouse parallax (desktop only)
     const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
-
-    // Mouse parallax effect (disabled on touch devices for performance)
     const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
     useEffect(() => {
-        if (isTouchDevice) return; // Skip parallax on touch devices
+        if (isTouchDevice) return;
         const handleMouseMove = (e) => {
             const x = (e.clientX / window.innerWidth - 0.5) * 20;
             const y = (e.clientY / window.innerHeight - 0.5) * 20;
@@ -126,32 +114,63 @@ const StoryReader = () => {
         return () => window.removeEventListener('mousemove', handleMouseMove);
     }, [isTouchDevice]);
 
-    // Swipe gesture support for mobile
-    const [touchStart, setTouchStart] = useState(null);
-    const handleTouchStart = (e) => {
-        setTouchStart(e.touches[0].clientX);
+    // Pointer Interaction Logic (Tap, Hold, Swipe)
+    const pointerRef = React.useRef({ startX: 0, startTime: 0 });
+
+    const handlePointerDown = (e) => {
+        // Verify we are not clicking a button
+        if (e.target.closest('button')) return;
+
+        setIsHolding(true);
+        pointerRef.current = {
+            startX: e.clientX,
+            startTime: Date.now()
+        };
     };
-    const handleTouchEnd = (e) => {
-        if (touchStart === null) return;
-        const touchEnd = e.changedTouches[0].clientX;
-        const diff = touchStart - touchEnd;
+
+    const handlePointerUp = (e) => {
+        // If not holding (e.g. invalid start), ignore
+        if (!isHolding) return;
+
+        setIsHolding(false);
+
+        // Verify we are not clicking a button (though down check covers most)
+        if (e.target.closest('button')) return;
+
+        const endTime = Date.now();
+        const endX = e.clientX;
+        const diffX = pointerRef.current.startX - endX;
+        const duration = endTime - pointerRef.current.startTime;
+        const absDiff = Math.abs(diffX);
         const minSwipeDistance = 50;
 
-        if (diff > minSwipeDistance) {
-            // Swiped left -> go forward
-            handleNext();
-        } else if (diff < -minSwipeDistance) {
-            // Swiped right -> go back
-            handleBack();
+        if (absDiff > minSwipeDistance) {
+            // Swipe Detected
+            if (diffX > 0) {
+                handleNext();
+            } else {
+                handleBack();
+            }
+        } else {
+            // No Swipe
+            if (duration < 200) {
+                // Short Tap -> Next
+                handleNext();
+            }
+            // If duration > 200 (Hold), we just released, so auto-advance timer resumes via effect
         }
-        setTouchStart(null);
+    };
+
+    const handlePointerLeave = () => {
+        if (isHolding) setIsHolding(false);
     };
 
     return (
         <div
-            className="h-screen w-full flex items-center justify-center cursor-default relative overflow-hidden transition-colors duration-1000"
-            onTouchStart={handleTouchStart}
-            onTouchEnd={handleTouchEnd}
+            className="h-screen w-full flex items-center justify-center cursor-default relative overflow-hidden transition-colors duration-1000 select-none touch-none"
+            onPointerDown={handlePointerDown}
+            onPointerUp={handlePointerUp}
+            onPointerLeave={handlePointerLeave}
             style={{
                 backgroundColor: story.theme.background,
                 color: story.theme.text
@@ -165,24 +184,33 @@ const StoryReader = () => {
                 }}
             />
 
-            {/* Decorative Floating Elements with Parallax */}
+            {/* Decorative Floating Elements with Parallax - Optimized for Performance */}
+            {/* Using radial gradients instead of blur filters for mobile performance */}
             <Motion.div
-                className="absolute top-1/4 left-1/4 w-64 h-64 bg-white/20 rounded-full blur-3xl"
+                className="absolute top-1/4 left-1/4 w-64 h-64 rounded-full"
+                style={{
+                    background: 'radial-gradient(circle, rgba(255,255,255,0.2) 0%, transparent 70%)',
+                    willChange: 'transform' // Hardware acceleration hint
+                }}
                 animate={{
                     x: mousePos.x * -2,
                     y: mousePos.y * -2,
                     scale: [1, 1.1, 1],
                 }}
-                transition={{ scale: { duration: 4, repeat: Infinity } }}
+                transition={{ scale: { duration: 4, repeat: Infinity, ease: "linear" } }}
             />
             <Motion.div
-                className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-white/30 rounded-full blur-3xl"
+                className="absolute bottom-1/4 right-1/4 w-80 h-80 rounded-full"
+                style={{
+                    background: 'radial-gradient(circle, rgba(255,255,255,0.15) 0%, transparent 70%)',
+                    willChange: 'transform'
+                }}
                 animate={{
                     x: mousePos.x * -1.5,
                     y: mousePos.y * -1.5,
                     scale: [1.1, 1, 1.1],
                 }}
-                transition={{ scale: { duration: 5, repeat: Infinity } }}
+                transition={{ scale: { duration: 5, repeat: Infinity, ease: "linear" } }}
             />
 
             <AnimatePresence mode="wait">
@@ -191,15 +219,14 @@ const StoryReader = () => {
                     initial={{ opacity: 0, scale: 0.95, y: 20 }}
                     animate={{ opacity: 1, scale: 1, y: 0 }}
                     exit={{ opacity: 0, scale: 1.05, y: -20 }}
-                    transition={
-                        isPaused
-                            ? { type: "spring", stiffness: 400, damping: 30, mass: 0.8 } // Faster/Snappy for manual
-                            : { type: "spring", stiffness: 120, damping: 20 } // Slow/Floaty for auto
-                    }
-                    className="max-w-4xl px-12 py-16 mx-4 text-center z-10 relative cursor-pointer"
-                    onClick={handleNext} // Allow clicking text to advance
+                    transition={{
+                        duration: 0.4,
+                        ease: "easeOut" // Simpler easing than spring for better consistency on low-end
+                    }}
+                    className="max-w-4xl px-12 py-16 mx-4 text-center z-10 relative"
                     style={{
-                        transform: `translate(${mousePos.x}px, ${mousePos.y}px)`
+                        transform: `translate(${mousePos.x}px, ${mousePos.y}px)`,
+                        willChange: 'transform, opacity'
                     }}
                 >
                     <p
@@ -211,7 +238,7 @@ const StoryReader = () => {
                 </Motion.div>
             </AnimatePresence>
 
-            {/* Cute Navigation Controls */}
+            {/* Cute Navigation Controls - Explicit Buttons */}
             <div className="absolute bottom-24 left-0 right-0 flex justify-center gap-12 z-50 pointer-events-none">
                 <AnimatePresence>
                     {chapterIndex > 0 && (
@@ -263,16 +290,15 @@ const StoryReader = () => {
                 ))}
             </div>
 
-            {/* Tap hint (only if not interacting) */}
-            {!isPaused && (
+            {/* Hold hint */}
+            {isHolding && (
                 <Motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 0.4 }}
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
                     exit={{ opacity: 0 }}
-                    transition={{ delay: 2, duration: 1 }}
-                    className="absolute bottom-6 text-sm font-medium tracking-widest uppercase opacity-40 mix-blend-multiply"
+                    className="absolute top-12 right-12 px-4 py-2 bg-black/20 backdrop-blur-md rounded-full text-white text-sm font-medium"
                 >
-                    Tap controls to pause
+                    Paused ⏸️
                 </Motion.div>
             )}
         </div>
