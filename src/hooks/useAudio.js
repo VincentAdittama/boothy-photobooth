@@ -96,20 +96,32 @@ const useAudio = () => {
     }, [getAudioContext]);
 
     // Play a sound by name
-    const playSound = useCallback((name) => {
+    const playSound = useCallback(async (name) => {
         // Try Web Audio API first (more reliable for rapid sounds)
         const ctx = getAudioContext();
         const buffer = audioBuffersRef.current[name];
 
-        if (ctx && buffer && ctx.state === 'running') {
-            try {
-                const source = ctx.createBufferSource();
-                source.buffer = buffer;
-                source.connect(ctx.destination);
-                source.start(0);
-                return;
-            } catch (e) {
-                console.warn('Web Audio playback failed, trying fallback:', e);
+        if (ctx && buffer) {
+            // Resume context if suspended (can happen on mobile)
+            if (ctx.state === 'suspended') {
+                try {
+                    await ctx.resume();
+                } catch (e) {
+                    console.warn('Failed to resume AudioContext:', e);
+                }
+            }
+
+            if (ctx.state === 'running') {
+                try {
+                    const source = ctx.createBufferSource();
+                    source.buffer = buffer;
+                    source.connect(ctx.destination);
+                    source.start(0);
+                    console.log(`[Audio] Playing ${name} via Web Audio API`);
+                    return;
+                } catch (e) {
+                    console.warn('Web Audio playback failed, trying fallback:', e);
+                }
             }
         }
 
@@ -117,13 +129,30 @@ const useAudio = () => {
         const audio = fallbackAudioRef.current[name];
         if (audio) {
             try {
-                // Clone the audio to allow overlapping playback
-                const clone = audio.cloneNode();
-                clone.volume = 1;
-                clone.play().catch(e => console.log('Fallback audio play failed:', e));
+                // Reset and play directly instead of cloning (more reliable on mobile)
+                audio.currentTime = 0;
+                audio.volume = 1;
+                const playPromise = audio.play();
+                if (playPromise) {
+                    playPromise
+                        .then(() => console.log(`[Audio] Playing ${name} via HTML5 Audio`))
+                        .catch(e => {
+                            console.log('HTML5 Audio play failed, trying clone:', e);
+                            // If direct play fails, try clone as last resort
+                            try {
+                                const clone = audio.cloneNode();
+                                clone.volume = 1;
+                                clone.play().catch(e2 => console.warn('Clone audio failed:', e2));
+                            } catch (e2) {
+                                console.warn('Failed to clone audio:', e2);
+                            }
+                        });
+                }
             } catch (e) {
                 console.warn('Fallback audio failed:', e);
             }
+        } else {
+            console.warn(`[Audio] No audio loaded for: ${name}`);
         }
     }, [getAudioContext]);
 
