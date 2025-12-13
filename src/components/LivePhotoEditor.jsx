@@ -22,7 +22,7 @@ const LivePhotoEditor = ({ photoIndex, onClose }) => {
     } = useStore();
 
     // Determine if we need to flip the preview (same logic as Studio.jsx)
-    const shouldFlip = capturedImageIsMirrored !== (originalCapturedImageIsMirroredArray?.[photoIndex] ?? originalCapturedImageIsMirrored);
+    const shouldFlip = capturedImageIsMirrored;
 
     const frames = livePhotoFrames[photoIndex] || [];
     const initialFrameIndex = selectedFrameIndices[photoIndex] || 24; // Default to snap moment

@@ -351,8 +351,8 @@ const Studio = () => {
                                     src={capturedImage}
                                     name="background"
                                     isBackground={true}
-                                    x={(capturedImageIsMirrored !== (originalCapturedImageIsMirroredArray[0] ?? originalCapturedImageIsMirrored)) ? layout.width : 0}
-                                    scaleX={(capturedImageIsMirrored !== (originalCapturedImageIsMirroredArray[0] ?? originalCapturedImageIsMirrored)) ? -1 : 1}
+                                    x={capturedImageIsMirrored ? layout.width : 0}
+                                    scaleX={capturedImageIsMirrored ? -1 : 1}
                                     y={0}
                                     width={layout.width}
                                     height={layout.height}
@@ -370,8 +370,8 @@ const Studio = () => {
                                         src={src}
                                         name="background"
                                         isBackground={true}
-                                        x={(capturedImageIsMirrored !== (originalCapturedImageIsMirroredArray[i] ?? originalCapturedImageIsMirrored)) ? (xPos + photoSize) : xPos}
-                                        scaleX={(capturedImageIsMirrored !== (originalCapturedImageIsMirroredArray[i] ?? originalCapturedImageIsMirrored)) ? -1 : 1}
+                                        x={capturedImageIsMirrored ? (xPos + photoSize) : xPos}
+                                        scaleX={capturedImageIsMirrored ? -1 : 1}
                                         y={yPos}
                                         width={photoSize}
                                         height={photoSize}

@@ -103,6 +103,9 @@ const Booth = ({ hideUI = false }) => {
             await delay(warmMs);
         }
 
+        // Initialize view state to match booth preference at START of capture
+        setCapturedImageIsMirrored(isMirrored);
+
         for (let i = 0; i < TOTAL_SHOTS; i++) {
             // Countdown
             setIsCountingDown(true);
@@ -177,7 +180,7 @@ const Booth = ({ hideUI = false }) => {
             setCapturedImage(shots[0]); // Set first as preview or primary
 
             // Meta info
-            setCapturedImageIsMirrored(false); // We store unmirrored data
+            // setCapturedImageIsMirrored(isMirrored); // Already set at start
             setOriginalCapturedImageIsMirrored(Boolean(isMirrored)); // Track feed mirroring state
 
             setIsUploading(true);
@@ -388,7 +391,7 @@ const Booth = ({ hideUI = false }) => {
                                 src={shot.src}
                                 alt="flying-photo"
                                 className="w-full h-full object-cover"
-                                style={{ transform: (capturedImageIsMirrored !== shot.originalMirrored) ? 'scaleX(-1)' : 'none' }}
+                                style={{ transform: shot.originalMirrored ? 'scaleX(-1)' : 'none' }}
                             />
                         </Motion.div>
                     </Motion.div>
@@ -426,7 +429,7 @@ const Booth = ({ hideUI = false }) => {
                                 transition={{ duration: 0.45, ease: 'easeOut' }}
                             >
                                 {capturedImages && capturedImages[idx] ? (
-                                    <img src={capturedImages[idx]} alt={`strip-${idx}`} className="w-full h-full object-cover" style={{ transform: (capturedImageIsMirrored !== (originalCapturedImageIsMirroredArray[idx] ?? originalCapturedImageIsMirrored)) ? 'scaleX(-1)' : 'none' }} />
+                                    <img src={capturedImages[idx]} alt={`strip-${idx}`} className="w-full h-full object-cover" style={{ transform: capturedImageIsMirrored ? 'scaleX(-1)' : 'none' }} />
                                 ) : (
                                     <div className="w-full h-full bg-gray-100 flex items-center justify-center text-gray-300">---</div>
                                 )}
@@ -533,7 +536,7 @@ const Booth = ({ hideUI = false }) => {
                                         transition={{ duration: 0.45, ease: 'easeOut' }}
                                     >
                                         {capturedImages && capturedImages[idx] ? (
-                                            <img src={capturedImages[idx]} alt={`strip-${idx}`} className="w-full h-full object-cover" style={{ transform: (capturedImageIsMirrored !== (originalCapturedImageIsMirroredArray[idx] ?? originalCapturedImageIsMirrored)) ? 'scaleX(-1)' : 'none' }} />
+                                            <img src={capturedImages[idx]} alt={`strip-${idx}`} className="w-full h-full object-cover" style={{ transform: capturedImageIsMirrored ? 'scaleX(-1)' : 'none' }} />
                                         ) : (
                                             <div className="w-full h-full bg-gray-100 flex items-center justify-center text-gray-300 text-xs">---</div>
                                         )}
