@@ -95,6 +95,8 @@ const Booth = ({ hideUI = false }) => {
         setLandedShots([false, false, false]);
         resetLivePhotoState();
         resetOriginalCapturedImageIsMirroredArray();
+        // Clear retake state to hide the glow effect during transition
+        clearRetakeState();
         const shots = [];
         const allLiveFrames = [];
         const TOTAL_SHOTS = 3;
