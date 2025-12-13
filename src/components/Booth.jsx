@@ -372,13 +372,16 @@ const Booth = ({ hideUI = false }) => {
             </div>
 
             {/* Main Booth UI - hidden during transition */}
-            <div className={`w-full h-full flex flex-col transition-opacity duration-300 ${hideUI ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
+            {/* Using visibility:hidden instead of conditional render to prevent layout shifts */}
+            <div className={`w-full h-full flex flex-col transition-opacity duration-300 ${hideUI ? 'opacity-0 pointer-events-none invisible' : 'opacity-100 visible'}`}>
 
                 {/* Responsive Layout Container */}
-                <div className="flex flex-col lg:items-center lg:justify-center h-full">
+                {/* Mobile: centered grid, Desktop: flex centered */}
+                <div className="flex flex-col lg:items-center lg:justify-center h-full lg:h-full">
 
                     {/* Camera Feed - Single Webcam for both mobile and desktop */}
-                    <div className="relative flex-1 lg:flex-none lg:w-full lg:max-w-[80vh] lg:h-auto lg:max-h-[80vh] lg:aspect-square lg:rounded-3xl overflow-hidden lg:shadow-2xl lg:border-4 lg:border-white/20">
+                    {/* Mobile: fixed aspect ratio container (WYSIWYG - no cropping), Desktop: large square */}
+                    <div className="relative w-full aspect-square max-h-[60vh] lg:flex-none lg:max-w-[80vh] lg:max-h-[80vh] lg:rounded-3xl overflow-hidden lg:shadow-2xl lg:border-4 lg:border-white/20 flex items-center justify-center bg-black">
                         <Webcam
                             audio={false}
                             ref={webcamRef}
@@ -475,39 +478,37 @@ const Booth = ({ hideUI = false }) => {
                         </Motion.div>
                     </div>
 
-                    {/* Mobile Controls */}
+                    {/* Mobile Controls - uses visibility instead of conditional rendering to prevent layout shifts */}
                     <div className="lg:hidden shrink-0 py-4 flex justify-center items-center gap-6 bg-black">
-                        {!isCountingDown && !isUploading && !isStripAnimating && (
-                            <>
-                                <Motion.button
-                                    whileTap={{ scale: 0.9 }}
-                                    onClick={() => setIsMirrored(!isMirrored)}
-                                    className={`w-14 h-14 backdrop-blur-md rounded-full border-2 border-white/50 flex items-center justify-center ${isMirrored ? 'bg-blue-400/20' : 'bg-white/20'}`}
-                                >
-                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={`w-7 h-7 ${isMirrored ? 'text-blue-400' : 'text-white'}`}>
-                                        <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 21 3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5" />
-                                    </svg>
-                                </Motion.button>
+                        <div className={`flex items-center gap-6 transition-opacity duration-200 ${(isCountingDown || isUploading || isStripAnimating) ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
+                            <Motion.button
+                                whileTap={{ scale: 0.9 }}
+                                onClick={() => setIsMirrored(!isMirrored)}
+                                className={`w-14 h-14 backdrop-blur-md rounded-full border-2 border-white/50 flex items-center justify-center ${isMirrored ? 'bg-blue-400/20' : 'bg-white/20'}`}
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={`w-7 h-7 ${isMirrored ? 'text-blue-400' : 'text-white'}`}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 21 3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5" />
+                                </svg>
+                            </Motion.button>
 
-                                <Motion.button
-                                    whileTap={{ scale: 0.9 }}
-                                    onClick={() => setIsFlashEnabled(!isFlashEnabled)}
-                                    className={`w-14 h-14 backdrop-blur-md rounded-full border-2 border-white/50 flex items-center justify-center ${isFlashEnabled ? 'bg-yellow-400/20' : 'bg-white/20'}`}
-                                >
-                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={`w-7 h-7 ${isFlashEnabled ? 'text-yellow-400' : 'text-white'}`}>
-                                        <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" />
-                                    </svg>
-                                </Motion.button>
+                            <Motion.button
+                                whileTap={{ scale: 0.9 }}
+                                onClick={() => setIsFlashEnabled(!isFlashEnabled)}
+                                className={`w-14 h-14 backdrop-blur-md rounded-full border-2 border-white/50 flex items-center justify-center ${isFlashEnabled ? 'bg-yellow-400/20' : 'bg-white/20'}`}
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={`w-7 h-7 ${isFlashEnabled ? 'text-yellow-400' : 'text-white'}`}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" />
+                                </svg>
+                            </Motion.button>
 
-                                <Motion.button
-                                    whileTap={{ scale: 0.9 }}
-                                    onClick={handleStartCapture}
-                                    className="w-18 h-18 bg-white rounded-full border-4 border-gray-200 shadow-xl flex items-center justify-center"
-                                >
-                                    <div className="w-14 h-14 bg-cute-pink rounded-full" />
-                                </Motion.button>
-                            </>
-                        )}
+                            <Motion.button
+                                whileTap={{ scale: 0.9 }}
+                                onClick={handleStartCapture}
+                                className="w-18 h-18 bg-white rounded-full border-4 border-gray-200 shadow-xl flex items-center justify-center"
+                            >
+                                <div className="w-14 h-14 bg-cute-pink rounded-full" />
+                            </Motion.button>
+                        </div>
                     </div>
 
                     {/* Mobile Login info - bottom */}
