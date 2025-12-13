@@ -10,8 +10,8 @@ import LivePhotoEditor from './LivePhotoEditor';
 const Studio = () => {
     const {
         capturedImage, setPhase, capturedImageIsMirrored, setCapturedImageIsMirrored,
-        originalCapturedImageIsMirrored, originalCapturedImageIsMirroredArray, capturedImages, livePhotoFrames,
-        currentlyEditingPhotoIndex, setCurrentlyEditingPhotoIndex
+        capturedImages, livePhotoFrames,
+        currentlyEditingPhotoIndex, setCurrentlyEditingPhotoIndex, setIsRetakeSelecting
     } = useStore();
     const stageRef = useRef(null);
     const [stickers, setStickers] = useState([]);
@@ -515,7 +515,7 @@ const Studio = () => {
                         Download Image
                     </button>
                     <button
-                        onClick={() => setPhase('BOOTH')}
+                        onClick={() => { setIsRetakeSelecting(true); setPhase('BOOTH'); }}
                         className="w-full py-3 bg-gray-100 text-gray-600 font-bold rounded-xl hover:bg-gray-200 transition-colors"
                     >
                         Retake Photo
@@ -564,7 +564,7 @@ const Studio = () => {
                         Download
                     </button>
                     <button
-                        onClick={() => setPhase('BOOTH')}
+                        onClick={() => { setIsRetakeSelecting(true); setPhase('BOOTH'); }}
                         className="flex-1 py-3 bg-gray-100 text-gray-600 font-bold rounded-xl text-sm min-h-[48px]"
                     >
                         Retake

@@ -16,9 +16,7 @@ const LivePhotoEditor = ({ photoIndex, onClose }) => {
         setSelectedFrameIndex,
         updateCapturedImage,
         capturedImages,
-        capturedImageIsMirrored,
-        originalCapturedImageIsMirrored,
-        originalCapturedImageIsMirroredArray
+        capturedImageIsMirrored
     } = useStore();
 
     // Determine if we need to flip the preview (same logic as Studio.jsx)

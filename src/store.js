@@ -18,6 +18,10 @@ export const useStore = create((set) => ({
     isCurtainOpen: true, // Controls the curtain transition mechanism
     isTransitioning: false, // Tracks when transitioning from Booth to Studio (prevents Booth unmount)
 
+    // Retake selection mode state
+    isRetakeSelecting: false, // Whether user is selecting which photo to retake
+    retakePhotoIndex: null, // Which photo (0, 1, 2) is being retaken
+
     // Live Photo feature state
     livePhotoFrames: [], // Array of frame arrays, one per captured image (48 frames each)
     selectedFrameIndices: [24, 24, 24], // Default to center frame (the snap moment) for each photo
@@ -46,6 +50,11 @@ export const useStore = create((set) => ({
     resetOriginalCapturedImageIsMirroredArray: () => set({ originalCapturedImageIsMirroredArray: [] }),
     setIsCurtainOpen: (isOpen) => set({ isCurtainOpen: isOpen }),
     setIsTransitioning: (transitioning) => set({ isTransitioning: transitioning }),
+
+    // Retake selection actions
+    setIsRetakeSelecting: (selecting) => set({ isRetakeSelecting: selecting }),
+    setRetakePhotoIndex: (index) => set({ retakePhotoIndex: index }),
+    clearRetakeState: () => set({ isRetakeSelecting: false, retakePhotoIndex: null }),
 
     // Live Photo feature actions
     setLivePhotoFrames: (frames) => set({ livePhotoFrames: frames }),
