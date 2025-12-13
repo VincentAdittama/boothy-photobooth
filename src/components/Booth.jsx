@@ -488,12 +488,12 @@ const Booth = ({ hideUI = false }) => {
                         >
                             {/* Photo with glow and shadow effect */}
                             <Motion.div
-                                initial={{ boxShadow: '0 4px 20px rgba(0,0,0,0.3), 0 0 0 3px rgba(255,255,255,0.8)' }}
+                                initial={{ boxShadow: '0 6px 30px rgba(0,0,0,0.35)' }}
                                 animate={{
                                     boxShadow: [
-                                        '0 4px 20px rgba(0,0,0,0.3), 0 0 0 3px rgba(255,255,255,0.8)',
-                                        '0 20px 50px rgba(0,0,0,0.5), 0 0 30px 5px rgba(255,255,255,0.4), 0 0 0 4px rgba(255,255,255,0.9)',
-                                        '0 8px 25px rgba(0,0,0,0.4), 0 0 0 3px rgba(255,255,255,0.9)'
+                                        '0 6px 30px rgba(0,0,0,0.35)',
+                                        '0 20px 50px rgba(0,0,0,0.5)',
+                                        '0 8px 25px rgba(0,0,0,0.4)'
                                     ]
                                 }}
                                 transition={{ duration: 0.9, times: [0, 0.5, 1] }}
