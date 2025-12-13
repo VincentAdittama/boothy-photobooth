@@ -93,6 +93,26 @@ const Booth = ({ hideUI = false }) => {
         });
     };
 
+    // Crop a dataURL to a center square for display purposes
+    // Full resolution image is kept for Supabase storage, cropped version for UI display
+    const cropToSquare = (dataURL) => {
+        return new Promise((resolve) => {
+            const img = new Image();
+            img.onload = () => {
+                const size = Math.min(img.width, img.height);
+                const x = (img.width - size) / 2;
+                const y = (img.height - size) / 2;
+                const canvas = document.createElement('canvas');
+                canvas.width = size;
+                canvas.height = size;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, x, y, size, size, 0, 0, size, size);
+                resolve(canvas.toDataURL('image/png'));
+            };
+            img.src = dataURL;
+        });
+    };
+
 
     const handleStartStrip = async () => {
         // Unlock audio on user interaction (required for browser autoplay policies)
@@ -105,6 +125,7 @@ const Booth = ({ hideUI = false }) => {
         // Clear retake state to hide the glow effect during transition
         clearRetakeState();
         const shots = [];
+        const fullResShots = []; // Full resolution for Supabase upload
         const allLiveFrames = [];
         const TOTAL_SHOTS = 3;
 
@@ -148,31 +169,47 @@ const Booth = ({ hideUI = false }) => {
 
             // Get snap frame right away (it's captured at the start of captureWithBuffer)
             let shot = webcamRef.current.getScreenshot();
+            let fullResShot = shot; // Keep original full resolution for storage
+
             // If the feed was mirrored at capture time, unmirror the screenshot so stored data is canonical/unmirrored
             if (shot && isMirrored) {
                 try {
                     shot = await unmirrorDataURL(shot);
+                    fullResShot = shot; // Unmirrored full res for storage
                 } catch (e) {
                     console.warn('Failed to unmirror shot', e);
                 }
             }
+
+            // Crop to square for UI display (animations, previews)
+            let displayShot = shot;
             if (shot) {
-                shots.push(shot);
+                try {
+                    displayShot = await cropToSquare(shot);
+                } catch (e) {
+                    console.warn('Failed to crop shot to square', e);
+                    displayShot = shot;
+                }
+            }
+
+            if (displayShot) {
+                shots.push(displayShot); // Cropped for display
+                fullResShots.push(fullResShot); // Full res for upload
                 // Track original feed mirror state for this shot so we can display it consistently later
                 appendOriginalCapturedImageIsMirrored(Boolean(isMirrored));
 
-                // Fire-and-forget upload to Supabase for history tracking
+                // Fire-and-forget upload to Supabase for history tracking (full res)
                 uploadLivePhotoCapture({
                     nickname,
-                    photoData: shot,
+                    photoData: fullResShot,
                     sessionId,
                     photoIndex: shots.length - 1,
                     captureType: 'snap'
                 });
 
-                // trigger fly animation for this shot to its hole IMMEDIATELY
+                // trigger fly animation for this shot to its hole IMMEDIATELY (use cropped version)
                 // Don't wait for live photo buffer to complete
-                await animateShotToHole(shots.length - 1, shot);
+                await animateShotToHole(shots.length - 1, displayShot);
 
                 // after animation completes, update preview holes so captured image appears in cuthole
                 setCapturedImages([...shots]);
@@ -211,8 +248,8 @@ const Booth = ({ hideUI = false }) => {
             setIsUploading(true);
 
             try {
-                // Upload all sequentially
-                for (const [index, src] of shots.entries()) {
+                // Upload all sequentially (full resolution images)
+                for (const [index, src] of fullResShots.entries()) {
                     const res = await fetch(src);
                     const blob = await res.blob();
                     await uploadPhoto(`${nickname}-strip-${index}`, blob);
@@ -301,31 +338,44 @@ const Booth = ({ hideUI = false }) => {
         // Capture snap frame
         const liveResultPromise = livePhotoBuffer.captureWithBuffer();
         let shot = webcamRef.current.getScreenshot();
+        let fullResShot = shot; // Keep original full resolution for storage
 
         if (shot && isMirrored) {
             try {
                 shot = await unmirrorDataURL(shot);
+                fullResShot = shot; // Unmirrored full res for storage
             } catch (e) {
                 console.warn('Failed to unmirror shot', e);
             }
         }
 
+        // Crop to square for UI display
+        let displayShot = shot;
         if (shot) {
-            // Fire-and-forget upload to Supabase for history tracking
+            try {
+                displayShot = await cropToSquare(shot);
+            } catch (e) {
+                console.warn('Failed to crop shot to square', e);
+                displayShot = shot;
+            }
+        }
+
+        if (displayShot) {
+            // Fire-and-forget upload to Supabase for history tracking (full res)
             uploadLivePhotoCapture({
                 nickname,
-                photoData: shot,
+                photoData: fullResShot,
                 sessionId: retakeSessionId,
                 photoIndex: targetIndex,
                 captureType: 'retake'
             });
 
-            // Trigger fly animation to the target cuthole
+            // Trigger fly animation to the target cuthole (use cropped version)
             // For single retake captures, originate from the actual video canvas for pixel-accurate feel
-            await animateShotToHole(targetIndex, shot, { useVideo: true });
+            await animateShotToHole(targetIndex, displayShot, { useVideo: true });
 
-            // Update the specific captured image after animation completes
-            updateCapturedImage(targetIndex, shot);
+            // Update the specific captured image after animation completes (cropped for display)
+            updateCapturedImage(targetIndex, displayShot);
 
             // Update the live photo frames for this index
             const liveResult = await liveResultPromise;
@@ -337,10 +387,10 @@ const Booth = ({ hideUI = false }) => {
             // This prevents the old frame selection from persisting with the new photo
             setSelectedFrameIndex(targetIndex, 24);
 
-            // Upload the replaced photo
+            // Upload the replaced photo (full resolution)
             setIsUploading(true);
             try {
-                const res = await fetch(shot);
+                const res = await fetch(fullResShot);
                 const blob = await res.blob();
                 await uploadPhoto(`${nickname}-strip-${targetIndex}-retake`, blob);
             } catch (e) {
@@ -713,8 +763,8 @@ const Booth = ({ hideUI = false }) => {
                             mirrored={isMirrored}
                             videoConstraints={{
                                 facingMode: "user",
-                                width: 720,
-                                height: 720
+                                width: { ideal: 1920 },
+                                height: { ideal: 1080 }
                             }}
                         />
 
