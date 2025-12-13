@@ -324,7 +324,7 @@ const Studio = () => {
 
             {/* Main Canvas Area - takes remaining space after bottom controls on mobile */}
             <Motion.div
-                className="flex-1 min-h-0 relative bg-checkered flex items-center justify-center overflow-hidden"
+                className="flex-1 min-h-0 relative flex items-center justify-center overflow-hidden"
                 style={{ padding: 'var(--strip-padding)' }}
                 ref={containerRef}
                 onDrop={handleDrop}
