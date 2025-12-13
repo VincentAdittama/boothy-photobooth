@@ -48,7 +48,7 @@ function App() {
               opacity: { duration: 0.05, ease: "easeIn" }, // Quick fade in
               exit: { duration: 0.2, ease: "easeOut" } // Slow fade out
             }}
-            className="fixed inset-0 hdr-flash z-50 pointer-events-none"
+            className="fixed inset-0 hdr-flash z-[300] pointer-events-none"
           />
         )}
       </AnimatePresence>

@@ -41,6 +41,7 @@ const Booth = ({ hideUI = false }) => {
     const holeRefs = [useRef(null), useRef(null), useRef(null)];
     const mobileHoleRefs = [useRef(null), useRef(null), useRef(null)];
     const stripRef = useRef(null);
+    const mobileStripRef = useRef(null);
     const webcamContainerRef = useRef(null);
     const [isStripAnimating, setIsStripAnimating] = useState(false);
     const [stripAnimPath, setStripAnimPath] = useState({
@@ -48,6 +49,12 @@ const Booth = ({ hideUI = false }) => {
         target: { x: 0, y: 0 },
         targetScale: 1.2
     });
+    const [mobileStripAnimPath, setMobileStripAnimPath] = useState({
+        inspect: { x: 0, y: 0 },
+        target: { x: 0, y: 0 },
+        targetScale: 0.8
+    });
+    const [mobileStripInitPos, setMobileStripInitPos] = useState({ left: 0, top: 0 });
     const [landedShots, setLandedShots] = useState([false, false, false]);
 
     // Track screen size for mobile/desktop switching
@@ -490,24 +497,31 @@ const Booth = ({ hideUI = false }) => {
     // Animate strip through inspect (center screen) then to Studio canvas target
     const animateStripToBooth = async () => {
         const stripEl = stripRef.current;
+        const mobileStripEl = mobileStripRef.current;
 
         // Use the exact same layout logic as Studio to determine target scale/pos
-        const isDesktop = window.innerWidth >= 768;
-        const containerW = isDesktop ? window.innerWidth - 320 : window.innerWidth;
+        // Desktop strip shows at lg (1024px+), mobile strip shows below lg
+        // But Studio sidebar shows at md (768px+)
+        // For animation target, we need to match Studio's layout which uses md breakpoint for sidebar
+        const isDesktopLayout = window.innerWidth >= 768;
+        // Desktop sidebar is w-80 = 320px
+        const SIDEBAR_WIDTH = 320;
+        const containerW = isDesktopLayout ? window.innerWidth - SIDEBAR_WIDTH : window.innerWidth;
         const containerH = window.innerHeight;
 
+        // Calculate Studio's layout for desktop - Studio uses full containerH for its flex-1 area
         const layout = calculateStripLayout(containerW, containerH, 3);
 
-        // Target X needs to be the center of the Studio's canvas area
-        // If desktop, sidebar is 320px on the right. 
-        // So canvas center is (windowWidth - 320) / 2
-        // IF we want it to land exactly where it renders in Studio.
+        // Target position: center of the Studio's canvas container (flex-1 area)
+        // The canvas is centered within the flex container using flex items-center justify-center
+        // The actual strip position is the center of the canvas container
         let targetX = containerW / 2;
-        let targetY = containerH / 2; // Vertically centered
+        let targetY = containerH / 2;
 
         const screenCenter = { left: window.innerWidth / 2, top: window.innerHeight / 2 }; // inspect spot
-        const canvasCenter = { left: targetX, top: targetY }; // final spot
+        const canvasCenter = { left: targetX, top: targetY }; // final spot for desktop
 
+        // Desktop strip animation path
         if (stripEl && stripEl.getBoundingClientRect) {
             const sr = stripEl.getBoundingClientRect();
             const stripCenter = { left: sr.left + sr.width / 2, top: sr.top + sr.height / 2 };
@@ -522,10 +536,94 @@ const Booth = ({ hideUI = false }) => {
                 y: canvasCenter.top - stripCenter.top
             };
 
+            // Calculate proper scale: match the strip's height to Studio's layout height
+            // The strip doesn't rotate on desktop, so height maps to height
+            // Studio has Stage at layout.height wrapped with border-4 (4px each side = 8px total)
+            // So visual height = layout.height + 8
+            // sr.height from getBoundingClientRect already includes the Booth strip's border
+            const BORDER_SIZE = 8; // border-4 = 4px each side
+            const desktopTargetScale = (layout.height + BORDER_SIZE) / sr.height;
+
             setStripAnimPath({
                 inspect: inspectDelta,
                 target: targetDelta,
-                targetScale: layout.scale
+                targetScale: desktopTargetScale
+            });
+        }
+
+        // Mobile strip animation path - needs to target Studio's actual layout
+        // Note: Studio uses md (768px) breakpoint for sidebar/bottom bar
+        // But Booth shows mobile strip until lg (1024px)
+        // So in the 768-1024px range, the mobile strip needs to target desktop-style Studio layout
+        if (mobileStripEl && mobileStripEl.getBoundingClientRect) {
+            const msr = mobileStripEl.getBoundingClientRect();
+            // Store the top-left corner position for simpler positioning (no transform offset needed)
+            const mobileStripTopLeft = { left: msr.left, top: msr.top };
+            const mobileStripCenter = { left: msr.left + msr.width / 2, top: msr.top + msr.height / 2 };
+
+            // Store top-left position for the fixed-position animated clone
+            setMobileStripInitPos(mobileStripTopLeft);
+
+            // Inspect position: true viewport center
+            // Delta from top-left to center the strip at viewport center
+            const mobileInspectDelta = {
+                x: (window.innerWidth / 2) - mobileStripCenter.left,
+                y: (window.innerHeight / 2) - mobileStripCenter.top
+            };
+
+            // Determine target layout based on Studio's md breakpoint (not Booth's lg breakpoint)
+            // Studio shows sidebar at >= 768px, bottom bar at < 768px
+            const studioHasSidebar = window.innerWidth >= 768;
+            
+            let mobileCanvasW, mobileCanvasH, mobileCanvasCenterX, mobileCanvasCenterY;
+            
+            if (studioHasSidebar) {
+                // Studio desktop layout: sidebar on right, full height canvas
+                mobileCanvasW = window.innerWidth - SIDEBAR_WIDTH;
+                mobileCanvasH = containerH;
+                mobileCanvasCenterX = mobileCanvasW / 2;
+                mobileCanvasCenterY = mobileCanvasH / 2;
+            } else {
+                // Studio mobile layout: full width, bottom bar takes space
+                // - Container border-t: 1px
+                // - Sticker scroll row: p-3 (24px) + h-14 (56px) + border-b (1px) = 81px
+                // - Action buttons row: p-3 (24px) + min-h-[48px] buttons = 72px
+                // Total bottom bar ≈ 154px
+                const MOBILE_BOTTOM_BAR_HEIGHT = 154;
+                mobileCanvasW = window.innerWidth;
+                mobileCanvasH = containerH - MOBILE_BOTTOM_BAR_HEIGHT;
+                mobileCanvasCenterX = mobileCanvasW / 2;
+                mobileCanvasCenterY = mobileCanvasH / 2;
+            }
+
+            // Calculate the actual layout for the canvas area
+            const mobileLayout = calculateStripLayout(mobileCanvasW, mobileCanvasH, 3);
+
+            const mobileCanvasCenter = {
+                left: mobileCanvasCenterX,
+                top: mobileCanvasCenterY
+            };
+
+            const mobileTargetDelta = {
+                x: mobileCanvasCenter.left - mobileStripCenter.left,
+                y: mobileCanvasCenter.top - mobileStripCenter.top
+            };
+
+            // Calculate proper scale: the mobile animated strip rotates 90°
+            // After rotation, its width becomes height and vice versa
+            // The strip starts horizontal (width > height), ends vertical (height > width)
+            // Source: msr.width (horizontal) → Target: mobileLayout.height (vertical strip height)
+            // But since the strip rotates 90°, what was width becomes height
+            // So we match: rotated strip height (original width) to target height (mobileLayout.height)
+            // Studio has Stage at layout.height wrapped with border-4 (4px each side = 8px total)
+            // msr.width from getBoundingClientRect already includes the Booth strip's border
+            const BORDER_SIZE = 8; // border-4 = 4px each side
+            const mobileTargetScale = (mobileLayout.height + BORDER_SIZE) / msr.width;
+
+            setMobileStripAnimPath({
+                inspect: mobileInspectDelta,
+                target: mobileTargetDelta,
+                targetScale: mobileTargetScale
             });
         }
 
@@ -536,7 +634,93 @@ const Booth = ({ hideUI = false }) => {
 
     return (
         <div className="h-full w-full bg-black relative overflow-hidden flex flex-col items-center justify-center">
+            {/* MOBILE ANIMATED STRIP - Using FIXED positioning to escape overflow-hidden */}
+            {/* Strip rotates 90° while photos counter-rotate to stay upright (pinned effect) */}
+            {/* Lazy animation like desktop: wobble, float, and shiny effect */}
+            <AnimatePresence>
+                {isStripAnimating && isMobile && (
+                    <Motion.div
+                        key="mobile-strip-animation"
+                        initial={{ scale: 1, rotate: 0, x: 0, y: 0 }}
+                        animate={{
+                            // Position: start → center screen (inspect with float) → Studio target
+                            // Added subtle float (+15) at inspect phase like desktop
+                            x: [0, mobileStripAnimPath.inspect.x, mobileStripAnimPath.inspect.x, mobileStripAnimPath.target.x],
+                            y: [0, mobileStripAnimPath.inspect.y, mobileStripAnimPath.inspect.y + 15, mobileStripAnimPath.target.y],
+                            // Scale: initial bump, grow at inspect, hold, then scale to Studio size
+                            scale: [1.1, 1.35, 1.4, mobileStripAnimPath.targetScale],
+                            // Rotate 90° during inspect phase with wobble like desktop (-5, +5 equivalent effect)
+                            // Since we also rotate 90°, we add the wobble on top: 0 → 85 → 95 → 90
+                            rotate: [0, 85, 95, 90]
+                        }}
+                        transition={{
+                            duration: 3.5,
+                            ease: [0.4, 0, 0.2, 1],
+                            // Match desktop timing: [0, 0.143, 0.714, 1] for lazy linger at inspect
+                            times: [0, 0.143, 0.714, 1]
+                        }}
+                        className="fixed z-[200] bg-white rounded-lg shadow-2xl border-4 border-white overflow-hidden pointer-events-none"
+                        style={{
+                            // Position at the top-left corner of where the static strip was
+                            // Framer Motion x/y transforms will move it from here
+                            left: mobileStripInitPos.left,
+                            top: mobileStripInitPos.top,
+                            padding: 'calc(var(--strip-padding) * 0.5)'
+                        }}
+                    >
+                        {/* Photos container - each photo counter-rotates to stay upright */}
+                        <div
+                            className="flex flex-row items-center relative z-10"
+                            style={{ gap: 'calc(var(--strip-padding) * 0.5)' }}
+                        >
+                            {Array.from({ length: 3 }).map((_, idx) => (
+                                <Motion.div
+                                    key={idx}
+                                    className="w-14 h-14 sm:w-16 sm:h-16 bg-gray-100 overflow-hidden flex items-center justify-center relative rounded-sm"
+                                    initial={{ rotate: 0 }}
+                                    animate={{
+                                        // Counter-rotate until vertical, then "stick" to strip for overshoot
+                                        // Strip goes: 0 → 85 → 95 → 90
+                                        // Images: counter-rotate to -90° (vertical), then stay stuck at -90°
+                                        // This makes images tilt with the strip's overshoot wobble after vertical
+                                        rotate: [0, -85, -90, -90, -90]
+                                    }}
+                                    transition={{
+                                        duration: 3.5,
+                                        ease: [0.4, 0, 0.2, 1],
+                                        // Extra keyframe at ~0.43 when strip crosses exactly 90°
+                                        times: [0, 0.143, 0.43, 0.714, 1]
+                                    }}
+                                >
+                                    {capturedImages && capturedImages[idx] ? (
+                                        <img src={capturedImages[idx]} alt={`strip-${idx}`} className="w-full h-full object-cover" style={{ transform: capturedImageIsMirrored ? 'scaleX(-1)' : 'none' }} />
+                                    ) : (
+                                        <div className="w-full h-full bg-gray-100 flex items-center justify-center text-gray-300 text-xs">---</div>
+                                    )}
+                                </Motion.div>
+                            ))}
+                        </div>
+
+                        {/* Shine/Glare Effect - same as desktop */}
+                        <Motion.div
+                            initial={{ x: '-100%', opacity: 0 }}
+                            animate={{
+                                x: ['-100%', '200%'],
+                                opacity: [0, 1, 1, 0]
+                            }}
+                            transition={{
+                                delay: 0.8,
+                                duration: 1.5,
+                                ease: "easeInOut"
+                            }}
+                            className="absolute inset-0 w-full h-full bg-linear-to-tr from-transparent via-white/60 to-transparent z-20 pointer-events-none skew-x-12"
+                        />
+                    </Motion.div>
+                )}
+            </AnimatePresence>
+
             {/* Flying Photos Animation - photos fly from webcam to preview strip holes */}
+
             <AnimatePresence>
                 {flyingShots.map(shot => (
                     <div
@@ -797,21 +981,10 @@ const Booth = ({ hideUI = false }) => {
                     </div>
 
                     {/* Mobile Strip Preview - below video (only on mobile) */}
-                    <div className="lg:hidden shrink-0 py-3 flex justify-center bg-black">
-                        <Motion.div
-                            initial={{ scale: 1, rotate: 0, x: 0, y: 0 }}
-                            animate={isStripAnimating ? {
-                                y: [0, -100, -100, -300],
-                                scale: [1.1, 1.35, 1.4, 0.8],
-                                rotate: [0, -3, 3, 0],
-                                opacity: [1, 1, 1, 0],
-                                transition: {
-                                    duration: 3.5,
-                                    ease: [0.4, 0, 0.2, 1],
-                                    times: [0, 0.143, 0.714, 1]
-                                }
-                            } : {}}
-                            transition={{ type: 'spring', stiffness: 120, damping: 18, mass: 1 }}
+                    {/* Static version: shown when NOT animating, hidden during animation */}
+                    <div className={`lg:hidden shrink-0 py-3 flex justify-center bg-black ${isStripAnimating ? 'invisible' : 'visible'}`}>
+                        <div
+                            ref={mobileStripRef}
                             className={`bg-white rounded-lg shadow-2xl border-4 relative overflow-hidden transition-colors duration-300 ${isRetakeSelecting ? 'border-cute-pink' : 'border-white'}`}
                             style={{ padding: 'calc(var(--strip-padding) * 0.5)' }}
                         >
@@ -847,23 +1020,9 @@ const Booth = ({ hideUI = false }) => {
                                     </Motion.div>
                                 ))}
                             </div>
-
-                            {/* Shine/Glare Effect */}
-                            <Motion.div
-                                initial={{ x: '-100%', opacity: 0 }}
-                                animate={isStripAnimating ? {
-                                    x: ['-100%', '200%'],
-                                    opacity: [0, 1, 1, 0]
-                                } : {}}
-                                transition={{
-                                    delay: 0.8,
-                                    duration: 1.5,
-                                    ease: "easeInOut"
-                                }}
-                                className="absolute inset-0 w-full h-full bg-linear-to-r from-transparent via-white/60 to-transparent z-20 pointer-events-none skew-x-12"
-                            />
-                        </Motion.div>
+                        </div>
                     </div>
+
 
                     {/* Mobile Controls - Clean symmetrical design */}
                     <div className="lg:hidden shrink-0 py-5 flex justify-center items-center bg-gradient-to-t from-black via-black/80 to-transparent">
