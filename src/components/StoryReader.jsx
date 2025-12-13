@@ -239,7 +239,7 @@ const StoryReader = () => {
             </AnimatePresence>
 
             {/* Cute Navigation Controls - Explicit Buttons */}
-            <div className="absolute bottom-24 left-0 right-0 flex justify-center gap-12 z-50 pointer-events-none">
+            <div className="absolute bottom-40 left-0 right-0 flex justify-center gap-12 z-50 pointer-events-none">
                 <AnimatePresence>
                     {chapterIndex > 0 && (
                         <Motion.button
@@ -275,7 +275,7 @@ const StoryReader = () => {
             </div>
 
             {/* Progress Indicator */}
-            <div className="absolute bottom-12 left-0 right-0 flex justify-center gap-3 z-20">
+            <div className="absolute bottom-28 left-0 right-0 flex justify-center gap-3 z-20">
                 {story.chapters.map((_, idx) => (
                     <Motion.div
                         key={idx}

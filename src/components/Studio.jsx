@@ -525,7 +525,7 @@ const Studio = () => {
 
             {/* Mobile Bottom Bar with Stickers + Actions */}
             <Motion.div
-                className="flex md:hidden flex-col bg-white border-t border-gray-200 shrink-0 z-10"
+                className="flex md:hidden flex-col bg-white border-t border-gray-200 shrink-0 z-10 pb-16 md:pb-0"
                 animate={{
                     y: isEditing ? 100 : 0,
                     opacity: isEditing ? 0.3 : 1

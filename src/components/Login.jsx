@@ -254,7 +254,7 @@ const Login = () => {
             </main>
 
             {/* Footer Sticker Grid */}
-            <footer className="bg-cute-pink py-8 px-4 shrink-0">
+            <footer className="bg-cute-pink py-8 px-4 shrink-0 pb-16 md:pb-8">
                 <div className="max-w-4xl mx-auto grid grid-cols-4 md:grid-cols-8 gap-8 justify-items-center">
                     {stickers.map((sticker, index) => {
                         // Generate random values for "organic" feel

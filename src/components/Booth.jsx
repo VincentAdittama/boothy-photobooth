@@ -464,7 +464,7 @@ const Booth = ({ hideUI = false }) => {
         const activeHoleRefs = isMobile ? mobileHoleRefs : holeRefs;
         const holeEl = activeHoleRefs[index]?.current;
         let target = isMobile
-            ? { left: window.innerWidth / 2, top: window.innerHeight - 150 }
+            ? { left: window.innerWidth / 2, top: window.innerHeight - 200 } // Adjusted for pb-16 safe zone
             : { left: 80, top: window.innerHeight / 2 };
         if (holeEl) {
             const hr = holeEl.getBoundingClientRect();
@@ -574,9 +574,9 @@ const Booth = ({ hideUI = false }) => {
             // Determine target layout based on Studio's md breakpoint (not Booth's lg breakpoint)
             // Studio shows sidebar at >= 768px, bottom bar at < 768px
             const studioHasSidebar = window.innerWidth >= 768;
-            
+
             let mobileCanvasW, mobileCanvasH, mobileCanvasCenterX, mobileCanvasCenterY;
-            
+
             if (studioHasSidebar) {
                 // Studio desktop layout: sidebar on right, full height canvas
                 mobileCanvasW = window.innerWidth - SIDEBAR_WIDTH;
@@ -588,6 +588,8 @@ const Booth = ({ hideUI = false }) => {
                 // - Container border-t: 1px
                 // - Sticker scroll row: p-3 (24px) + h-14 (56px) + border-b (1px) = 81px
                 // - Action buttons row: p-3 (24px) + min-h-[48px] buttons = 72px
+                // Note: Safe zone padding (pb-16) is INSIDE the bottom bar container, 
+                // not additional height above the canvas
                 // Total bottom bar ≈ 154px
                 const MOBILE_BOTTOM_BAR_HEIGHT = 154;
                 mobileCanvasW = window.innerWidth;
@@ -806,7 +808,7 @@ const Booth = ({ hideUI = false }) => {
                                 initial={{ opacity: 0, y: -20 }}
                                 animate={{ opacity: 1, y: 0 }}
                                 transition={{ delay: 0.1, type: 'spring', stiffness: 300, damping: 25 }}
-                                className="flex items-center gap-3 px-4 py-2.5 bg-gradient-to-r from-cute-pink to-pink-400 text-white font-bold rounded-2xl shadow-lg pointer-events-auto"
+                                className="flex items-center gap-3 px-4 py-2.5 bg-linear-to-r from-cute-pink to-pink-400 text-white font-bold rounded-2xl shadow-lg pointer-events-auto"
                             >
                                 <Motion.span
                                     animate={{ scale: [1, 1.2, 1] }}
@@ -821,9 +823,9 @@ const Booth = ({ hideUI = false }) => {
                         {/* Bottom Right: Back Button (Mobile Retake Mode) */}
                         {/* Positioned similarly to Studio's bottom actions */}
                         <Motion.div
-                             initial={{ opacity: 0, scale: 0.9 }}
-                             animate={{ opacity: 1, scale: 1 }}
-                             className="fixed bottom-6 right-6 z-[101]"
+                            initial={{ opacity: 0, scale: 0.9 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            className="fixed bottom-24 right-6 z-101"
                         >
                             <Motion.button
                                 onClick={handleBackToStudio}
