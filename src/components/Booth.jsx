@@ -799,13 +799,14 @@ const Booth = ({ hideUI = false }) => {
                         <div className="absolute inset-0 bg-black/20" />
 
                         {/* Top bar */}
-                        <div className="absolute top-0 left-0 right-0 flex items-center justify-between p-4 lg:p-6">
-                            {/* Left: Instruction badge */}
+                        {/* Top bar */}
+                        <div className="absolute top-0 left-0 right-0 flex items-center justify-center p-4 lg:p-6 pointer-events-none">
+                            {/* Instruction badge - Centered */}
                             <Motion.div
-                                initial={{ opacity: 0, x: -20 }}
-                                animate={{ opacity: 1, x: 0 }}
+                                initial={{ opacity: 0, y: -20 }}
+                                animate={{ opacity: 1, y: 0 }}
                                 transition={{ delay: 0.1, type: 'spring', stiffness: 300, damping: 25 }}
-                                className="flex items-center gap-3 px-4 py-2.5 bg-gradient-to-r from-cute-pink to-pink-400 text-white font-bold rounded-2xl shadow-lg"
+                                className="flex items-center gap-3 px-4 py-2.5 bg-gradient-to-r from-cute-pink to-pink-400 text-white font-bold rounded-2xl shadow-lg pointer-events-auto"
                             >
                                 <Motion.span
                                     animate={{ scale: [1, 1.2, 1] }}
@@ -815,23 +816,26 @@ const Booth = ({ hideUI = false }) => {
                                 <span className="hidden sm:inline">Tap a photo to retake</span>
                                 <span className="sm:hidden">Tap to retake</span>
                             </Motion.div>
+                        </div>
 
-                            {/* Right: Back Button */}
+                        {/* Bottom Right: Back Button (Mobile Retake Mode) */}
+                        {/* Positioned similarly to Studio's bottom actions */}
+                        <Motion.div
+                             initial={{ opacity: 0, scale: 0.9 }}
+                             animate={{ opacity: 1, scale: 1 }}
+                             className="fixed bottom-6 right-6 z-[101]"
+                        >
                             <Motion.button
-                                initial={{ opacity: 0, x: 20 }}
-                                animate={{ opacity: 1, x: 0 }}
-                                transition={{ delay: 0.15, type: 'spring', stiffness: 300, damping: 25 }}
                                 onClick={handleBackToStudio}
                                 whileHover={{ scale: 1.05 }}
                                 whileTap={{ scale: 0.95 }}
-                                className="pointer-events-auto flex items-center gap-2 px-4 py-2.5 bg-white hover:bg-gray-50 rounded-2xl text-gray-700 font-bold shadow-lg transition-all border border-gray-100"
+                                className="pointer-events-auto flex items-center justify-center w-14 h-14 bg-white hover:bg-gray-50 rounded-2xl text-gray-700 shadow-xl transition-all border-2 border-white/50"
                             >
-                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-4 h-4">
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 15L3 9m0 0l6-6M3 9h12a6 6 0 010 12h-3" />
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={3} stroke="currentColor" className="w-6 h-6 text-cute-pink">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
                                 </svg>
-                                <span className="hidden sm:inline">Done</span>
                             </Motion.button>
-                        </div>
+                        </Motion.div>
                     </Motion.div>
                 )}
             </AnimatePresence>
@@ -1085,10 +1089,10 @@ const Booth = ({ hideUI = false }) => {
                                     <Motion.div
                                         initial={{ opacity: 0, y: 10, scale: 0.9 }}
                                         animate={{ opacity: 1, y: 0, scale: 1 }}
-                                        className="absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap px-3 py-1.5 bg-gray-900/95 text-white text-[10px] font-bold rounded-full shadow-lg backdrop-blur-sm"
+                                        className="absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap px-3 py-1.5 bg-white text-gray-900 text-[10px] font-bold rounded-full shadow-lg backdrop-blur-sm"
                                     >
                                         Retake All
-                                        <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-gray-900 rotate-45" />
+                                        <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-white rotate-45" />
                                     </Motion.div>
                                 )}
                             </div>
