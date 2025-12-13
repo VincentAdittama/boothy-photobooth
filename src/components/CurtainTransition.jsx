@@ -10,15 +10,23 @@ const CurtainTransition = () => {
         ease: [0.22, 1, 0.36, 1], // Custom easing for smooth curtain feel
     };
 
+    // Hide curtains completely when open to avoid sub-pixel rendering artifacts on mobile
+    const curtainStyle = {
+        visibility: isCurtainOpen ? 'hidden' : 'visible',
+        transitionProperty: 'visibility',
+        transitionDelay: isCurtainOpen ? '0.8s' : '0s', // Hide after animation completes
+    };
+
     return (
         <div className="fixed inset-0 pointer-events-none z-100 flex overflow-hidden">
             {/* Left Curtain */}
             <motion.div
                 initial={{ x: '-100%' }}
-                // Overshoot slightly to avoid sub-pixel gaps on mobile
-                animate={{ x: isCurtainOpen ? '-110%' : '0%' }}
+                // Larger overshoot to ensure no artifacts on mobile
+                animate={{ x: isCurtainOpen ? '-120%' : '0%' }}
                 transition={transition}
                 className="w-1/2 h-full bg-[#E63946] border-r-4 border-[#333]/20 relative"
+                style={curtainStyle}
             >
                 {/* Fabric Texture/Fold gradients */}
                 <div className="absolute inset-0 bg-linear-to-r from-black/20 via-transparent to-black/20 opacity-50" />
@@ -28,10 +36,11 @@ const CurtainTransition = () => {
             {/* Right Curtain */}
             <motion.div
                 initial={{ x: '100%' }}
-                // Overshoot slightly to avoid sub-pixel gaps on mobile
-                animate={{ x: isCurtainOpen ? '110%' : '0%' }}
+                // Larger overshoot to ensure no artifacts on mobile
+                animate={{ x: isCurtainOpen ? '120%' : '0%' }}
                 transition={transition}
                 className="w-1/2 h-full bg-[#E63946] border-l-4 border-[#333]/20 relative"
+                style={curtainStyle}
             >
                 {/* Fabric Texture/Fold gradients */}
                 <div className="absolute inset-0 bg-linear-to-r from-black/20 via-transparent to-black/20 opacity-50" />
