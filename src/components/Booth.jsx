@@ -15,7 +15,7 @@ const Booth = ({ hideUI = false }) => {
         setLivePhotoFrames, resetLivePhotoState,
         // Retake selection state
         isRetakeSelecting, setRetakePhotoIndex, clearRetakeState, setIsRetakeSelecting,
-        updateCapturedImage, livePhotoFrames
+        updateCapturedImage, livePhotoFrames, setSelectedFrameIndex
     } = useStore();
 
     // Live Photo buffer hook - captures frames before and after each snap
@@ -296,6 +296,10 @@ const Booth = ({ hideUI = false }) => {
             const newFrames = [...livePhotoFrames];
             newFrames[targetIndex] = liveResult.frames;
             setLivePhotoFrames(newFrames);
+
+            // Reset the selected frame index to default (snap moment = 24)
+            // This prevents the old frame selection from persisting with the new photo
+            setSelectedFrameIndex(targetIndex, 24);
 
             // Upload the replaced photo
             setIsUploading(true);
