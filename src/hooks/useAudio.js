@@ -15,11 +15,6 @@ const useAudio = () => {
     const isUnlockedRef = useRef(false);
     const fallbackAudioRef = useRef({});
 
-    // Sound file paths
-    const soundPaths = {
-        shutter: '/sounds/shutter.wav',
-        beep: '/sounds/beep.wav'
-    };
 
     // Initialize Web Audio API context
     const getAudioContext = useCallback(() => {
@@ -35,6 +30,12 @@ const useAudio = () => {
     // Preload all audio files
     const preloadAudio = useCallback(async () => {
         const ctx = getAudioContext();
+
+        // Local sound paths (keep inside callback to avoid dependency churn)
+        const soundPaths = {
+            shutter: '/sounds/shutter.wav',
+            beep: '/sounds/beep.wav'
+        };
 
         // Preload using Web Audio API (higher quality, more reliable)
         if (ctx) {
@@ -85,7 +86,7 @@ const useAudio = () => {
                 audio.pause();
                 audio.volume = 1;
                 audio.currentTime = 0;
-            } catch (e) {
+            } catch {
                 // Expected to fail sometimes, that's okay
             }
         }

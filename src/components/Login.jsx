@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion as Motion, AnimatePresence } from 'framer-motion';
 import { useStore } from '../store';
 import { useMousePhysics } from '../hooks/useMousePhysics';
@@ -6,7 +6,16 @@ import { getStickers } from '../data/stickers';
 
 const Login = () => {
     const [inputValue, setInputValue] = useState('');
+    const [isMobile, setIsMobile] = useState(false);
     const { setPhase, setUserType, setNickname } = useStore();
+
+    // Detect mobile viewport (matches md breakpoint at 768px)
+    useEffect(() => {
+        const checkMobile = () => setIsMobile(window.innerWidth < 768);
+        checkMobile();
+        window.addEventListener('resize', checkMobile);
+        return () => window.removeEventListener('resize', checkMobile);
+    }, []);
 
     // Use custom hook for physics
     const {
@@ -152,8 +161,8 @@ const Login = () => {
 
                             {/* Placeholder for the large sticker in the design */}
                             <Motion.div
-                                whileHover={{ scale: 1.05 }}
-                                onMouseEnter={(e) => {
+                                whileHover={isMobile ? undefined : { scale: 1.05 }}
+                                onMouseEnter={isMobile ? undefined : (e) => {
                                     // set current pointer immediately to prevent jump
                                     const next = { x: e.clientX, y: e.clientY };
                                     mouseRef.current = next;
@@ -161,14 +170,14 @@ const Login = () => {
                                     setVelocity({ x: 0, y: 0 });
                                     setIsHovering(true);
                                 }}
-                                onMouseLeave={() => setIsHovering(false)}
+                                onMouseLeave={isMobile ? undefined : () => setIsHovering(false)}
                                 onClick={handleLogin}
                                 className="max-h-full filter drop-shadow-lg cursor-pointer"
                             >
                                 <img src="/assets/Asset 17.webp" alt="Sticker" className="max-h-full w-auto object-contain" />
                             </Motion.div>
 
-                            {isHovering && (() => {
+                            {!isMobile && isHovering && (() => {
                                 const BOARD_W = 180;
                                 const BOARD_H = 46;
                                 const STICK_LEN = 54;
