@@ -17,11 +17,12 @@ const LivePhotoEditor = ({ photoIndex, onClose }) => {
         updateCapturedImage,
         capturedImages,
         capturedImageIsMirrored,
-        originalCapturedImageIsMirrored
+        originalCapturedImageIsMirrored,
+        originalCapturedImageIsMirroredArray
     } = useStore();
 
     // Determine if we need to flip the preview (same logic as Studio.jsx)
-    const shouldFlip = capturedImageIsMirrored !== originalCapturedImageIsMirrored;
+    const shouldFlip = capturedImageIsMirrored !== (originalCapturedImageIsMirroredArray?.[photoIndex] ?? originalCapturedImageIsMirrored);
 
     const frames = livePhotoFrames[photoIndex] || [];
     const initialFrameIndex = selectedFrameIndices[photoIndex] || 24; // Default to snap moment
@@ -54,38 +55,6 @@ const LivePhotoEditor = ({ photoIndex, onClose }) => {
         setCurrentFrameIndex(frameIndex);
     }, [frames.length]);
 
-    const handleMouseDown = (e) => {
-        setIsDragging(true);
-        stopPlayback();
-        handleTimelineInteraction(e.clientX);
-    };
-
-    const handleMouseMove = (e) => {
-        if (isDragging) {
-            handleTimelineInteraction(e.clientX);
-        }
-    };
-
-    const handleMouseUp = () => {
-        setIsDragging(false);
-    };
-
-    const handleTouchStart = (e) => {
-        setIsDragging(true);
-        stopPlayback();
-        handleTimelineInteraction(e.touches[0].clientX);
-    };
-
-    const handleTouchMove = (e) => {
-        if (isDragging) {
-            handleTimelineInteraction(e.touches[0].clientX);
-        }
-    };
-
-    const handleTouchEnd = () => {
-        setIsDragging(false);
-    };
-
     // Playback controls
     const startPlayback = () => {
         if (frames.length === 0) return;
@@ -97,13 +66,13 @@ const LivePhotoEditor = ({ photoIndex, onClose }) => {
         }, 1000 / fps);
     };
 
-    const stopPlayback = () => {
+    const stopPlayback = useCallback(() => {
         if (playIntervalRef.current) {
             clearInterval(playIntervalRef.current);
             playIntervalRef.current = null;
         }
         setIsPlaying(false);
-    };
+    }, [setIsPlaying]);
 
     const togglePlayback = () => {
         if (isPlaying) {
@@ -112,6 +81,38 @@ const LivePhotoEditor = ({ photoIndex, onClose }) => {
             startPlayback();
         }
     };
+
+    const handleMouseDown = useCallback((e) => {
+        setIsDragging(true);
+        stopPlayback();
+        handleTimelineInteraction(e.clientX);
+    }, [handleTimelineInteraction, stopPlayback, setIsDragging]);
+
+    const handleMouseMove = useCallback((e) => {
+        if (isDragging) {
+            handleTimelineInteraction(e.clientX);
+        }
+    }, [isDragging, handleTimelineInteraction]);
+
+    const handleMouseUp = useCallback(() => {
+        setIsDragging(false);
+    }, [setIsDragging]);
+
+    const handleTouchStart = useCallback((e) => {
+        setIsDragging(true);
+        stopPlayback();
+        handleTimelineInteraction(e.touches[0].clientX);
+    }, [handleTimelineInteraction, stopPlayback, setIsDragging]);
+
+    const handleTouchMove = useCallback((e) => {
+        if (isDragging) {
+            handleTimelineInteraction(e.touches[0].clientX);
+        }
+    }, [isDragging, handleTimelineInteraction]);
+
+    const handleTouchEnd = useCallback(() => {
+        setIsDragging(false);
+    }, [setIsDragging]);
 
     // Cleanup on unmount
     useEffect(() => {
@@ -136,7 +137,7 @@ const LivePhotoEditor = ({ photoIndex, onClose }) => {
             window.removeEventListener('touchmove', handleTouchMove);
             window.removeEventListener('touchend', handleTouchEnd);
         };
-    }, [isDragging, handleTimelineInteraction]);
+    }, [isDragging, handleMouseMove, handleMouseUp, handleTouchMove, handleTouchEnd]);
 
     // Handle confirm - update the captured image with selected frame
     const handleConfirm = () => {
@@ -247,7 +248,8 @@ const LivePhotoEditor = ({ photoIndex, onClose }) => {
                                     backgroundImage: `url(${frame})`,
                                     backgroundSize: 'cover',
                                     backgroundPosition: 'center',
-                                    opacity: 0.6
+                                    opacity: 0.6,
+                                    transform: shouldFlip ? 'scaleX(-1)' : 'none'
                                 }}
                             />
                         ))}

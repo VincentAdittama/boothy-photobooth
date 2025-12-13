@@ -10,7 +10,7 @@ const Booth = ({ hideUI = false }) => {
     const webcamRef = useRef(null);
     const {
         setPhase, setCapturedImage, setCapturedImages, nickname, capturedImages,
-        isMirrored, setIsMirrored, setCapturedImageIsMirrored, setOriginalCapturedImageIsMirrored,
+        isMirrored, setIsMirrored, capturedImageIsMirrored, originalCapturedImageIsMirrored, originalCapturedImageIsMirroredArray, appendOriginalCapturedImageIsMirrored, resetOriginalCapturedImageIsMirroredArray, setCapturedImageIsMirrored, setOriginalCapturedImageIsMirrored,
         setIsFlashing, isFlashEnabled, setIsFlashEnabled, setIsCurtainOpen, setIsTransitioning,
         setLivePhotoFrames, resetLivePhotoState
     } = useStore();
@@ -32,7 +32,6 @@ const Booth = ({ hideUI = false }) => {
     const holeRefs = [useRef(null), useRef(null), useRef(null)];
     const mobileHoleRefs = [useRef(null), useRef(null), useRef(null)];
     const stripRef = useRef(null);
-    const mobileStripRef = useRef(null);
     const [isStripAnimating, setIsStripAnimating] = useState(false);
     const [stripAnimPath, setStripAnimPath] = useState({
         inspect: { x: 0, y: 0 },
@@ -40,7 +39,6 @@ const Booth = ({ hideUI = false }) => {
         targetScale: 1.2
     });
     const [landedShots, setLandedShots] = useState([false, false, false]);
-    const [isLiveCapturing, setIsLiveCapturing] = useState(false);
 
     // Track screen size for mobile/desktop switching
     useEffect(() => {
@@ -57,7 +55,7 @@ const Booth = ({ hideUI = false }) => {
         return () => {
             livePhotoBuffer.stopBuffering();
         };
-    }, [hideUI]);
+    }, [hideUI, livePhotoBuffer]);
 
     // Helper to sleep
     const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
@@ -67,25 +65,30 @@ const Booth = ({ hideUI = false }) => {
         audio.play().catch(e => console.log('Audio play failed', e));
     };
 
-    const takeShot = async () => {
-        // Flash logic
-        if (isFlashEnabled) {
-            setIsFlashing(true);
-            setTimeout(() => setIsFlashing(false), 250);
-        }
-        playSound('shutter');
-
-        // Wait for flash peak (50ms)
-        await delay(50);
-
-        const imageSrc = webcamRef.current.getScreenshot();
-        return imageSrc;
+    // NOTE: capture data is stored unmirrored. Mirroring should be handled at display time.
+    const unmirrorDataURL = (dataURL) => {
+        return new Promise((resolve) => {
+            const img = new Image();
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                canvas.width = img.width;
+                canvas.height = img.height;
+                const ctx = canvas.getContext('2d');
+                ctx.translate(canvas.width, 0);
+                ctx.scale(-1, 1);
+                ctx.drawImage(img, 0, 0);
+                resolve(canvas.toDataURL('image/png'));
+            };
+            img.src = dataURL;
+        });
     };
+
 
     const handleStartStrip = async () => {
         // reset landed state and live photo state for new capture sequence
         setLandedShots([false, false, false]);
         resetLivePhotoState();
+        resetOriginalCapturedImageIsMirroredArray();
         const shots = [];
         const allLiveFrames = [];
         const TOTAL_SHOTS = 3;
@@ -118,14 +121,22 @@ const Booth = ({ hideUI = false }) => {
             await delay(200);
 
             // Capture snap frame immediately, let buffer continue in background
-            setIsLiveCapturing(true);
             const liveResultPromise = livePhotoBuffer.captureWithBuffer();
 
             // Get snap frame right away (it's captured at the start of captureWithBuffer)
-            const shot = webcamRef.current.getScreenshot();
-
+            let shot = webcamRef.current.getScreenshot();
+            // If the feed was mirrored at capture time, unmirror the screenshot so stored data is canonical/unmirrored
+            if (shot && isMirrored) {
+                try {
+                    shot = await unmirrorDataURL(shot);
+                } catch (e) {
+                    console.warn('Failed to unmirror shot', e);
+                }
+            }
             if (shot) {
                 shots.push(shot);
+                // Track original feed mirror state for this shot so we can display it consistently later
+                appendOriginalCapturedImageIsMirrored(Boolean(isMirrored));
 
                 // trigger fly animation for this shot to its hole IMMEDIATELY
                 // Don't wait for live photo buffer to complete
@@ -143,7 +154,6 @@ const Booth = ({ hideUI = false }) => {
 
             // Now wait for live photo buffer to complete and gather frames
             const liveResult = await liveResultPromise;
-            setIsLiveCapturing(false);
             const frames = liveResult.frames; // All 48 frames
             allLiveFrames.push(frames);
 
@@ -163,8 +173,8 @@ const Booth = ({ hideUI = false }) => {
             setCapturedImage(shots[0]); // Set first as preview or primary
 
             // Meta info
-            setCapturedImageIsMirrored(Boolean(isMirrored));
-            setOriginalCapturedImageIsMirrored(Boolean(isMirrored));
+            setCapturedImageIsMirrored(false); // We store unmirrored data
+            setOriginalCapturedImageIsMirrored(Boolean(isMirrored)); // Track feed mirroring state
 
             setIsUploading(true);
 
@@ -250,7 +260,8 @@ const Booth = ({ hideUI = false }) => {
         const deltaY = target.top - initTop;
 
         const id = Date.now() + Math.random();
-        const flying = { id, src, initLeft, initTop, deltaX, deltaY };
+        // Capture the feed mirroring state at the exact moment of capture to avoid race conditions
+        const flying = { id, src, initLeft, initTop, deltaX, deltaY, originalMirrored: Boolean(isMirrored) };
 
         return new Promise((resolve) => {
             // add flying item
@@ -315,6 +326,71 @@ const Booth = ({ hideUI = false }) => {
 
     return (
         <div className="h-full w-full bg-black relative overflow-hidden flex flex-col items-center justify-center">
+            {/* Flying Photos Animation - photos fly from webcam to preview strip holes */}
+            <AnimatePresence>
+                {flyingShots.map(shot => (
+                    <Motion.div
+                        key={shot.id}
+                        initial={{
+                            position: 'fixed',
+                            left: shot.initLeft,
+                            top: shot.initTop,
+                            x: '-50%',
+                            y: '-50%',
+                            scale: 0.15,
+                            opacity: 0,
+                            rotate: -10,
+                            zIndex: 9999
+                        }}
+                        animate={{
+                            x: ['-50%', `calc(-50% + ${shot.deltaX * 0.3}px)`, `calc(-50% + ${shot.deltaX}px)`],
+                            y: ['-50%', `calc(-50% + ${shot.deltaY * 0.2 - 80}px)`, `calc(-50% + ${shot.deltaY}px)`],
+                            scale: [0.15, 0.85, 0.7],
+                            opacity: [0, 1, 1],
+                            rotate: [-10, 8, 0]
+                        }}
+                        exit={{
+                            opacity: 0,
+                            scale: 0.6,
+                            transition: { duration: 0.15 }
+                        }}
+                        transition={{
+                            duration: 0.9,
+                            ease: [0.34, 1.56, 0.64, 1], // Spring-like bounce
+                            times: [0, 0.5, 1]
+                        }}
+                        className="pointer-events-none"
+                        style={{
+                            position: 'fixed',
+                            left: shot.initLeft,
+                            top: shot.initTop,
+                            zIndex: 9999
+                        }}
+                    >
+                        {/* Photo with glow and shadow effect */}
+                        <Motion.div
+                            initial={{ boxShadow: '0 4px 20px rgba(0,0,0,0.3), 0 0 0 3px rgba(255,255,255,0.8)' }}
+                            animate={{
+                                boxShadow: [
+                                    '0 4px 20px rgba(0,0,0,0.3), 0 0 0 3px rgba(255,255,255,0.8)',
+                                    '0 20px 50px rgba(0,0,0,0.5), 0 0 30px 5px rgba(255,255,255,0.4), 0 0 0 4px rgba(255,255,255,0.9)',
+                                    '0 8px 25px rgba(0,0,0,0.4), 0 0 0 3px rgba(255,255,255,0.9)'
+                                ]
+                            }}
+                            transition={{ duration: 0.9, times: [0, 0.5, 1] }}
+                            className="w-28 h-28 lg:w-32 lg:h-32 rounded-sm overflow-hidden bg-white"
+                        >
+                            <img
+                                src={shot.src}
+                                alt="flying-photo"
+                                className="w-full h-full object-cover"
+                                style={{ transform: (capturedImageIsMirrored !== shot.originalMirrored) ? 'scaleX(-1)' : 'none' }}
+                            />
+                        </Motion.div>
+                    </Motion.div>
+                ))}
+            </AnimatePresence>
+
             {/* Left-side preview strip (desktop only) - ALWAYS VISIBLE for animation */}
             <div className="hidden lg:flex absolute left-6 top-1/2 transform -translate-y-1/2 z-200">
                 <Motion.div
@@ -346,7 +422,7 @@ const Booth = ({ hideUI = false }) => {
                                 transition={{ duration: 0.45, ease: 'easeOut' }}
                             >
                                 {capturedImages && capturedImages[idx] ? (
-                                    <img src={capturedImages[idx]} alt={`strip-${idx}`} className="w-full h-full object-cover" />
+                                    <img src={capturedImages[idx]} alt={`strip-${idx}`} className="w-full h-full object-cover" style={{ transform: (capturedImageIsMirrored !== (originalCapturedImageIsMirroredArray[idx] ?? originalCapturedImageIsMirrored)) ? 'scaleX(-1)' : 'none' }} />
                                 ) : (
                                     <div className="w-full h-full bg-gray-100 flex items-center justify-center text-gray-300">---</div>
                                 )}
@@ -453,7 +529,7 @@ const Booth = ({ hideUI = false }) => {
                                         transition={{ duration: 0.45, ease: 'easeOut' }}
                                     >
                                         {capturedImages && capturedImages[idx] ? (
-                                            <img src={capturedImages[idx]} alt={`strip-${idx}`} className="w-full h-full object-cover" />
+                                            <img src={capturedImages[idx]} alt={`strip-${idx}`} className="w-full h-full object-cover" style={{ transform: (capturedImageIsMirrored !== (originalCapturedImageIsMirroredArray[idx] ?? originalCapturedImageIsMirrored)) ? 'scaleX(-1)' : 'none' }} />
                                         ) : (
                                             <div className="w-full h-full bg-gray-100 flex items-center justify-center text-gray-300 text-xs">---</div>
                                         )}

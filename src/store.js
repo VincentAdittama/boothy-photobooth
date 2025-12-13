@@ -13,6 +13,8 @@ export const useStore = create((set) => ({
     isFlashEnabled: true,
     isCameraPreloading: false, // New state for pre-warming camera
     originalCapturedImageIsMirrored: false, // Tracks the mirroring state of the original captured blob
+    // New: array to track each captured image's original feed mirror state
+    originalCapturedImageIsMirroredArray: [],
     isCurtainOpen: true, // Controls the curtain transition mechanism
     isTransitioning: false, // Tracks when transitioning from Booth to Studio (prevents Booth unmount)
 
@@ -32,6 +34,16 @@ export const useStore = create((set) => ({
     setIsFlashEnabled: (enabled) => set({ isFlashEnabled: enabled }),
     setIsCameraPreloading: (preloading) => set({ isCameraPreloading: preloading }),
     setOriginalCapturedImageIsMirrored: (mirrored) => set({ originalCapturedImageIsMirrored: mirrored }),
+    // Update per-shot original mirrored flags
+    setOriginalCapturedImageIsMirroredAtIndex: (index, mirrored) => set((state) => ({
+        originalCapturedImageIsMirroredArray: state.originalCapturedImageIsMirroredArray.map((v, i) =>
+            i === index ? mirrored : v
+        )
+    })),
+    appendOriginalCapturedImageIsMirrored: (mirrored) => set((state) => ({
+        originalCapturedImageIsMirroredArray: [...(state.originalCapturedImageIsMirroredArray || []), mirrored]
+    })),
+    resetOriginalCapturedImageIsMirroredArray: () => set({ originalCapturedImageIsMirroredArray: [] }),
     setIsCurtainOpen: (isOpen) => set({ isCurtainOpen: isOpen }),
     setIsTransitioning: (transitioning) => set({ isTransitioning: transitioning }),
 

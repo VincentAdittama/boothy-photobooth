@@ -113,10 +113,7 @@ const StoryReader = () => {
     const displayText = currentChapter.text.replace(/{nickname}/g, nickname);
 
     // Detect touch device
-    const [isTouchDevice, setIsTouchDevice] = useState(false);
-    useEffect(() => {
-        setIsTouchDevice('ontouchstart' in window || navigator.maxTouchPoints > 0);
-    }, []);
+    const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
 
     // Mouse parallax effect (disabled on touch devices for performance)
     const [mousePos, setMousePos] = useState({ x: 0, y: 0 });

@@ -47,7 +47,7 @@ const URLImage = ({ src, isBackground = false, onSelect, onChange, onDragStart, 
             draggable={!isBackground}
             onClick={onSelect}
             onTap={onSelect}
-            onDragStart={(e) => {
+            onDragStart={() => {
                 if (!isBackground && onDragStart) {
                     onDragStart();
                 }
