@@ -84,30 +84,28 @@ const StoryReader = () => {
     }, [chapterIndex, isLastChapter, canAdvanceFromLast, handleNext, handleBack]); // Re-bind with latest state
 
     useEffect(() => {
-        // Only auto-advance if not paused
+        // Auto-advance to next chapter after delay
+        // For the last chapter, we auto-advance to BOOTH after the delay AND camera is ready
         let timeout;
-        // Don't auto-advance purely by time on the last chapter if we want to force the camera wait,
-        // but actually the camera wait logic is handled by the block.
-        // However, we should respect the longer delay if auto-advancing on last chapter.
 
-        if (!isPaused && currentChapter && currentChapter.delay) {
+        if (currentChapter && currentChapter.delay) {
+            // For the last chapter, ensure minimum delay for camera warmup (at least 3500ms)
+            // This happens automatically regardless of user interaction (no isPaused check for last chapter)
             const delay = (isLastChapter && currentChapter.delay < 3500) ? 3500 : currentChapter.delay;
 
             timeout = setTimeout(() => {
-                setChapterIndex((prev) => {
-                    if (prev < story.chapters.length - 1) {
-                        return prev + 1;
-                    } else {
-                        // Auto-advance also blocked by the logic? 
-                        // Actually here we are inside the timeout, so if the delay passed, we go.
-                        setPhase('BOOTH');
-                        return prev;
-                    }
-                });
+                if (isLastChapter) {
+                    // Last chapter: auto-advance to BOOTH after delay
+                    // The camera should be preloaded by now since we set isPreloading on last chapter
+                    setPhase('BOOTH');
+                } else if (!isPaused) {
+                    // Non-last chapters: only auto-advance if user hasn't paused
+                    setChapterIndex((prev) => prev + 1);
+                }
             }, delay);
         }
         return () => clearTimeout(timeout);
-    }, [chapterIndex, currentChapter, isPaused, isLastChapter, setPhase, story.chapters.length]); // added deps
+    }, [chapterIndex, currentChapter, isPaused, isLastChapter, setPhase, story.chapters.length]);
 
     // Parse text to replace variables
     const displayText = currentChapter.text.replace(/{nickname}/g, nickname);
