@@ -7,7 +7,7 @@ import { getStickers } from '../data/stickers';
 const Login = () => {
     const [inputValue, setInputValue] = useState('');
     const [isMobile, setIsMobile] = useState(false);
-    const { setPhase, setUserType, setNickname } = useStore();
+    const { setPhase, setUserType, setNickname, setCapturedImages } = useStore();
 
     // Detect mobile viewport (matches md breakpoint at 768px)
     useEffect(() => {
@@ -43,6 +43,11 @@ const Login = () => {
         // Easter Egg: Skip story if nickname is 'SKIP'
         if (input === 'SKIP') {
             setPhase('BOOTH');
+        } else if (input === 'KK') {
+            // Debug: Skip straight to Studio with mock images
+            const mockImg = '/assets/hello.webp';
+            setCapturedImages([mockImg, mockImg, mockImg]);
+            setPhase('STUDIO');
         } else {
             setPhase('STORY');
         }
