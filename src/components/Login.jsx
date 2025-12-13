@@ -94,12 +94,8 @@ const Login = () => {
                                     initial={{ opacity: 0, scale: 0.8, y: -20 }}
                                     animate={{ opacity: 1, scale: 1, y: 0 }}
                                     transition={{ type: 'spring', stiffness: 200, damping: 20 }}
-                                    onClick={() => {
-                                        if (inputValue.trim().length >= 3) {
-                                            handleLogin({ preventDefault: () => { } });
-                                        }
-                                    }}
-                                    className={`pointer-events-auto ${inputValue.trim().length >= 3 ? 'cursor-pointer' : 'cursor-not-allowed'}`}
+                                    onClick={() => handleLogin({ preventDefault: () => { } })}
+                                    className="pointer-events-auto cursor-pointer"
                                     style={{ filter: 'drop-shadow(0px 10px 10px rgba(0,0,0,0.2))' }}
                                 >
                                     <Motion.div
@@ -209,10 +205,10 @@ const Login = () => {
                                             className="relative flex flex-col items-center pointer-events-none"
                                         >
                                             <div className={`relative w-full text-center border-4 rounded-lg px-4 py-2 text-white font-black text-sm shadow-inner transform -translate-y-1 ${inputValue.trim().length >= 3
-                                                    ? 'bg-amber-700 border-amber-900'
-                                                    : inputValue.trim().length > 0
-                                                        ? 'bg-amber-600 border-amber-800'
-                                                        : 'bg-amber-500 border-amber-700'
+                                                ? 'bg-amber-700 border-amber-900'
+                                                : inputValue.trim().length > 0
+                                                    ? 'bg-amber-600 border-amber-800'
+                                                    : 'bg-amber-500 border-amber-700'
                                                 }`}>
                                                 <div className="absolute inset-0 border-2 border-[#ffffff20] rounded-lg pointer-events-none"></div>
                                                 <Motion.span
