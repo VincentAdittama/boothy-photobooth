@@ -112,9 +112,16 @@ const StoryReader = () => {
     // Parse text to replace variables
     const displayText = currentChapter.text.replace(/{nickname}/g, nickname);
 
-    // Mouse parallax effect
+    // Detect touch device
+    const [isTouchDevice, setIsTouchDevice] = useState(false);
+    useEffect(() => {
+        setIsTouchDevice('ontouchstart' in window || navigator.maxTouchPoints > 0);
+    }, []);
+
+    // Mouse parallax effect (disabled on touch devices for performance)
     const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
     useEffect(() => {
+        if (isTouchDevice) return; // Skip parallax on touch devices
         const handleMouseMove = (e) => {
             const x = (e.clientX / window.innerWidth - 0.5) * 20;
             const y = (e.clientY / window.innerHeight - 0.5) * 20;
@@ -122,12 +129,34 @@ const StoryReader = () => {
         };
         window.addEventListener('mousemove', handleMouseMove);
         return () => window.removeEventListener('mousemove', handleMouseMove);
-    }, []);
+    }, [isTouchDevice]);
+
+    // Swipe gesture support for mobile
+    const [touchStart, setTouchStart] = useState(null);
+    const handleTouchStart = (e) => {
+        setTouchStart(e.touches[0].clientX);
+    };
+    const handleTouchEnd = (e) => {
+        if (touchStart === null) return;
+        const touchEnd = e.changedTouches[0].clientX;
+        const diff = touchStart - touchEnd;
+        const minSwipeDistance = 50;
+
+        if (diff > minSwipeDistance) {
+            // Swiped left -> go forward
+            handleNext();
+        } else if (diff < -minSwipeDistance) {
+            // Swiped right -> go back
+            handleBack();
+        }
+        setTouchStart(null);
+    };
 
     return (
         <div
             className="h-screen w-full flex items-center justify-center cursor-default relative overflow-hidden transition-colors duration-1000"
-            // Removed global onClick to avoid accidental skips, moving to buttons/areas
+            onTouchStart={handleTouchStart}
+            onTouchEnd={handleTouchEnd}
             style={{
                 backgroundColor: story.theme.background,
                 color: story.theme.text

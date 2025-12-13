@@ -28,8 +28,11 @@ const Booth = ({ hideUI = false }) => {
     const [count, setCount] = useState(3);
     const [isUploading, setIsUploading] = useState(false);
     const [flyingShots, setFlyingShots] = useState([]); // {id, src, init:{l,t}, delta:{x,y}}
+    const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' ? window.innerWidth < 1024 : false);
     const holeRefs = [useRef(null), useRef(null), useRef(null)];
+    const mobileHoleRefs = [useRef(null), useRef(null), useRef(null)];
     const stripRef = useRef(null);
+    const mobileStripRef = useRef(null);
     const [isStripAnimating, setIsStripAnimating] = useState(false);
     const [stripAnimPath, setStripAnimPath] = useState({
         inspect: { x: 0, y: 0 },
@@ -38,6 +41,13 @@ const Booth = ({ hideUI = false }) => {
     });
     const [landedShots, setLandedShots] = useState([false, false, false]);
     const [isLiveCapturing, setIsLiveCapturing] = useState(false);
+
+    // Track screen size for mobile/desktop switching
+    useEffect(() => {
+        const handleResize = () => setIsMobile(window.innerWidth < 1024);
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    }, []);
 
     // Start live photo buffering when booth is visible
     useEffect(() => {
@@ -223,8 +233,12 @@ const Booth = ({ hideUI = false }) => {
     const animateShotToHole = async (index, src) => {
         // compute initial center and target hole center
         const c = getWebcamCenter();
-        const holeEl = holeRefs[index]?.current;
-        let target = { left: 80, top: window.innerHeight / 2 };
+        // Use mobile or desktop refs based on current screen size
+        const activeHoleRefs = isMobile ? mobileHoleRefs : holeRefs;
+        const holeEl = activeHoleRefs[index]?.current;
+        let target = isMobile
+            ? { left: window.innerWidth / 2, top: window.innerHeight - 150 }
+            : { left: 80, top: window.innerHeight / 2 };
         if (holeEl) {
             const hr = holeEl.getBoundingClientRect();
             target = { left: hr.left + hr.width / 2, top: hr.top + hr.height / 2 };
@@ -358,115 +372,195 @@ const Booth = ({ hideUI = false }) => {
             </div>
 
             {/* Main Booth UI - hidden during transition */}
-            <div className={`w-full h-full flex flex-col items-center justify-center transition-opacity duration-300 ${hideUI ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
-                {/* Camera Feed */}
-                <div className="relative w-full h-full max-w-[80vh] max-h-[80vh] rounded-3xl overflow-hidden shadow-2xl border-4 border-white/20">
-                    <Webcam
-                        audio={false}
-                        ref={webcamRef}
-                        screenshotFormat="image/png"
-                        className="w-full h-full object-cover"
-                        mirrored={isMirrored}
-                        videoConstraints={{
-                            facingMode: "user",
-                            width: 720,
-                            height: 720
-                        }}
-                    />
+            <div className={`w-full h-full flex flex-col transition-opacity duration-300 ${hideUI ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
 
-                    {/* Countdown Overlay */}
-                    <AnimatePresence>
-                        {isCountingDown && (
-                            <Motion.div
-                                initial={{ scale: 0.5, opacity: 0 }}
-                                animate={{ scale: 1.5, opacity: 1 }}
-                                exit={{ scale: 2, opacity: 0 }}
-                                key={count}
-                                className="absolute inset-0 flex items-center justify-center z-20 pointer-events-none"
-                            >
-                                <span className="text-9xl font-black text-white drop-shadow-[0_4px_4px_rgba(0,0,0,0.5)]">
-                                    {count}
-                                </span>
-                            </Motion.div>
-                        )}
-                    </AnimatePresence>
+                {/* Responsive Layout Container */}
+                <div className="flex flex-col lg:items-center lg:justify-center h-full">
 
-                    {/* Uploading Overlay */}
-                    {isUploading && !isStripAnimating && (
-                        <div className="absolute inset-0 bg-black/50 z-40 flex items-center justify-center backdrop-blur-sm">
-                            <div className="flex flex-col items-center gap-4">
-                                <div className="w-12 h-12 border-4 border-white border-t-transparent rounded-full animate-spin" />
-                                <p className="text-white font-bold text-xl">Developing photo strip...</p>
+                    {/* Camera Feed - Single Webcam for both mobile and desktop */}
+                    <div className="relative flex-1 lg:flex-none lg:w-full lg:max-w-[80vh] lg:h-auto lg:max-h-[80vh] lg:aspect-square lg:rounded-3xl overflow-hidden lg:shadow-2xl lg:border-4 lg:border-white/20">
+                        <Webcam
+                            audio={false}
+                            ref={webcamRef}
+                            screenshotFormat="image/png"
+                            className="w-full h-full object-cover"
+                            mirrored={isMirrored}
+                            videoConstraints={{
+                                facingMode: "user",
+                                width: 720,
+                                height: 720
+                            }}
+                        />
+
+                        {/* Countdown Overlay */}
+                        <AnimatePresence>
+                            {isCountingDown && (
+                                <Motion.div
+                                    initial={{ scale: 0.5, opacity: 0 }}
+                                    animate={{ scale: 1.5, opacity: 1 }}
+                                    exit={{ scale: 2, opacity: 0 }}
+                                    key={count}
+                                    className="absolute inset-0 flex items-center justify-center z-20 pointer-events-none"
+                                >
+                                    <span className="text-9xl font-black text-white drop-shadow-[0_4px_4px_rgba(0,0,0,0.5)]">
+                                        {count}
+                                    </span>
+                                </Motion.div>
+                            )}
+                        </AnimatePresence>
+
+                        {/* Uploading Overlay */}
+                        {isUploading && !isStripAnimating && (
+                            <div className="absolute inset-0 bg-black/50 z-40 flex items-center justify-center backdrop-blur-sm">
+                                <div className="flex flex-col items-center gap-4">
+                                    <div className="w-12 h-12 border-4 border-white border-t-transparent rounded-full animate-spin" />
+                                    <p className="text-white font-bold text-xl">Developing photo strip...</p>
+                                </div>
                             </div>
-                        </div>
-                    )}
-                </div>
+                        )}
+                    </div>
 
-                {/* center transition removed: using left preview -> center strip animation instead */}
+                    {/* Mobile Strip Preview - below video (only on mobile) */}
+                    <div className="lg:hidden shrink-0 py-3 flex justify-center bg-black">
+                        <Motion.div
+                            initial={{ scale: 1, rotate: 0, x: 0, y: 0 }}
+                            animate={isStripAnimating ? {
+                                y: [0, -100, -100, -300],
+                                scale: [1.1, 1.35, 1.4, 0.8],
+                                rotate: [0, -3, 3, 0],
+                                opacity: [1, 1, 1, 0],
+                                transition: {
+                                    duration: 3.5,
+                                    ease: [0.4, 0, 0.2, 1],
+                                    times: [0, 0.143, 0.714, 1]
+                                }
+                            } : {}}
+                            transition={{ type: 'spring', stiffness: 120, damping: 18, mass: 1 }}
+                            className="bg-white rounded-sm shadow-2xl border-4 border-white relative overflow-hidden"
+                            style={{ padding: 'calc(var(--strip-padding) * 0.5)' }}
+                        >
+                            <div className="flex flex-row items-center relative z-10" style={{ gap: 'calc(var(--strip-padding) * 0.5)' }}>
+                                {Array.from({ length: 3 }).map((_, idx) => (
+                                    <Motion.div
+                                        key={idx}
+                                        ref={mobileHoleRefs[idx]}
+                                        className="w-14 h-14 sm:w-16 sm:h-16 bg-gray-100 overflow-hidden flex items-center justify-center"
+                                        initial={{ scale: 1 }}
+                                        animate={landedShots[idx] ? { scale: [0.8, 1.05, 1] } : {}}
+                                        transition={{ duration: 0.45, ease: 'easeOut' }}
+                                    >
+                                        {capturedImages && capturedImages[idx] ? (
+                                            <img src={capturedImages[idx]} alt={`strip-${idx}`} className="w-full h-full object-cover" />
+                                        ) : (
+                                            <div className="w-full h-full bg-gray-100 flex items-center justify-center text-gray-300 text-xs">---</div>
+                                        )}
+                                    </Motion.div>
+                                ))}
+                            </div>
 
-                {/* Flying shot visuals (absolute images that animate to holes) */}
-                {flyingShots.map(f => (
-                    <Motion.img
-                        key={f.id}
-                        src={f.src}
-                        initial={{ x: 0, y: 0, opacity: 1, rotate: 0 }}
-                        animate={{ x: f.deltaX, y: f.deltaY, scale: [1, 1.05, 0.6], rotate: [0, 8, -6], opacity: 1 }}
-                        transition={{ duration: 0.9, ease: 'easeInOut' }}
-                        style={{ position: 'absolute', left: f.initLeft - 60, top: f.initTop - 80, width: 120, height: 160 }}
-                        className="rounded-md shadow-2xl z-250 pointer-events-none border-2 border-white/20 object-cover"
-                    />
-                ))}
+                            {/* Shine/Glare Effect */}
+                            <Motion.div
+                                initial={{ x: '-100%', opacity: 0 }}
+                                animate={isStripAnimating ? {
+                                    x: ['-100%', '200%'],
+                                    opacity: [0, 1, 1, 0]
+                                } : {}}
+                                transition={{
+                                    delay: 0.8,
+                                    duration: 1.5,
+                                    ease: "easeInOut"
+                                }}
+                                className="absolute inset-0 w-full h-full bg-linear-to-r from-transparent via-white/60 to-transparent z-20 pointer-events-none skew-x-12"
+                            />
+                        </Motion.div>
+                    </div>
 
-                {/* Controls */}
-                <div className="absolute bottom-8 left-0 right-0 flex justify-center items-center gap-8 z-10">
-                    {!isCountingDown && !isUploading && !isStripAnimating && (
-                        <>
-                            <Motion.button
-                                whileHover={{ scale: 1.1 }}
-                                whileTap={{ scale: 0.9 }}
-                                onClick={() => setIsMirrored(!isMirrored)}
-                                className={`w-16 h-16 backdrop-blur-md rounded-full border-2 border-white/50 flex items-center justify-center group ${isMirrored ? 'bg-blue-400/20' : 'bg-white/20'}`}
-                                title={isMirrored ? "Turn Mirroring Off" : "Turn Mirroring On"}
-                            >
-                                {/* Simple icon for mirror toggle */}
-                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={`w-8 h-8 ${isMirrored ? 'text-blue-400' : 'text-white'}`}>
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 21 3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5" />
-                                </svg>
-                            </Motion.button>
+                    {/* Mobile Controls */}
+                    <div className="lg:hidden shrink-0 py-4 flex justify-center items-center gap-6 bg-black">
+                        {!isCountingDown && !isUploading && !isStripAnimating && (
+                            <>
+                                <Motion.button
+                                    whileTap={{ scale: 0.9 }}
+                                    onClick={() => setIsMirrored(!isMirrored)}
+                                    className={`w-14 h-14 backdrop-blur-md rounded-full border-2 border-white/50 flex items-center justify-center ${isMirrored ? 'bg-blue-400/20' : 'bg-white/20'}`}
+                                >
+                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={`w-7 h-7 ${isMirrored ? 'text-blue-400' : 'text-white'}`}>
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 21 3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5" />
+                                    </svg>
+                                </Motion.button>
 
-                            <Motion.button
-                                whileHover={{ scale: 1.1 }}
-                                whileTap={{ scale: 0.9 }}
-                                onClick={() => setIsFlashEnabled(!isFlashEnabled)}
-                                className={`w-16 h-16 backdrop-blur-md rounded-full border-2 border-white/50 flex items-center justify-center group ${isFlashEnabled ? 'bg-yellow-400/20' : 'bg-white/20'}`}
-                                title={isFlashEnabled ? "Turn Flash Off" : "Turn Flash On"}
-                            >
-                                {/* Lightning bolt icon for flash */}
-                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={`w-8 h-8 ${isFlashEnabled ? 'text-yellow-400' : 'text-white'}`}>
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" />
-                                </svg>
-                            </Motion.button>
+                                <Motion.button
+                                    whileTap={{ scale: 0.9 }}
+                                    onClick={() => setIsFlashEnabled(!isFlashEnabled)}
+                                    className={`w-14 h-14 backdrop-blur-md rounded-full border-2 border-white/50 flex items-center justify-center ${isFlashEnabled ? 'bg-yellow-400/20' : 'bg-white/20'}`}
+                                >
+                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={`w-7 h-7 ${isFlashEnabled ? 'text-yellow-400' : 'text-white'}`}>
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" />
+                                    </svg>
+                                </Motion.button>
 
-                            {/* Export is always WYSIWYG (no toggle) - the preview equals exported image */}
+                                <Motion.button
+                                    whileTap={{ scale: 0.9 }}
+                                    onClick={handleStartCapture}
+                                    className="w-18 h-18 bg-white rounded-full border-4 border-gray-200 shadow-xl flex items-center justify-center"
+                                >
+                                    <div className="w-14 h-14 bg-cute-pink rounded-full" />
+                                </Motion.button>
+                            </>
+                        )}
+                    </div>
 
-                            <Motion.button
-                                whileHover={{ scale: 1.1 }}
-                                whileTap={{ scale: 0.9 }}
-                                onClick={handleStartCapture}
-                                className="w-20 h-20 bg-white rounded-full border-4 border-gray-200 shadow-xl flex items-center justify-center group"
-                            >
-                                <div className="w-16 h-16 bg-cute-pink rounded-full group-hover:bg-pink-400 transition-colors" />
-                            </Motion.button>
+                    {/* Mobile Login info - bottom */}
+                    <div className="lg:hidden shrink-0 py-2 bg-black text-center">
+                        <span className="text-white/50 font-mono text-xs">LOGGED IN AS: {nickname}</span>
+                    </div>
 
-                            {/* Spacer to balance the layout */}
-                            <div className="w-16 h-16" />
-                        </>
-                    )}
-                </div>
+                    {/* Desktop Controls - positioned absolutely over camera */}
+                    <div className="hidden lg:flex absolute bottom-8 left-0 right-0 justify-center items-center gap-8 z-10">
+                        {!isCountingDown && !isUploading && !isStripAnimating && (
+                            <>
+                                <Motion.button
+                                    whileHover={{ scale: 1.1 }}
+                                    whileTap={{ scale: 0.9 }}
+                                    onClick={() => setIsMirrored(!isMirrored)}
+                                    className={`w-16 h-16 backdrop-blur-md rounded-full border-2 border-white/50 flex items-center justify-center group ${isMirrored ? 'bg-blue-400/20' : 'bg-white/20'}`}
+                                    title={isMirrored ? "Turn Mirroring Off" : "Turn Mirroring On"}
+                                >
+                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={`w-8 h-8 ${isMirrored ? 'text-blue-400' : 'text-white'}`}>
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 21 3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5" />
+                                    </svg>
+                                </Motion.button>
 
-                {/* Decorative */}
-                <div className="absolute top-4 left-4 text-white/50 font-mono text-sm">
-                    LOGGED IN AS: {nickname}
+                                <Motion.button
+                                    whileHover={{ scale: 1.1 }}
+                                    whileTap={{ scale: 0.9 }}
+                                    onClick={() => setIsFlashEnabled(!isFlashEnabled)}
+                                    className={`w-16 h-16 backdrop-blur-md rounded-full border-2 border-white/50 flex items-center justify-center group ${isFlashEnabled ? 'bg-yellow-400/20' : 'bg-white/20'}`}
+                                    title={isFlashEnabled ? "Turn Flash Off" : "Turn Flash On"}
+                                >
+                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={`w-8 h-8 ${isFlashEnabled ? 'text-yellow-400' : 'text-white'}`}>
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" />
+                                    </svg>
+                                </Motion.button>
+
+                                <Motion.button
+                                    whileHover={{ scale: 1.1 }}
+                                    whileTap={{ scale: 0.9 }}
+                                    onClick={handleStartCapture}
+                                    className="w-20 h-20 bg-white rounded-full border-4 border-gray-200 shadow-xl flex items-center justify-center group"
+                                >
+                                    <div className="w-16 h-16 bg-cute-pink rounded-full group-hover:bg-pink-400 transition-colors" />
+                                </Motion.button>
+
+                                <div className="w-16 h-16" />
+                            </>
+                        )}
+                    </div>
+
+                    {/* Desktop Login info */}
+                    <div className="hidden lg:block absolute top-4 left-4 text-white/50 font-mono text-sm">
+                        LOGGED IN AS: {nickname}
+                    </div>
                 </div>
             </div>
         </div>

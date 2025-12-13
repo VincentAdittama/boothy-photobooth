@@ -200,7 +200,7 @@ const LivePhotoEditor = ({ photoIndex, onClose }) => {
 
             {/* Frame Preview */}
             <div className="flex-1 flex items-center justify-center p-4 overflow-hidden">
-                <div className="relative" style={{ width: '360px', height: '360px' }}>
+                <div className="relative w-full max-w-[360px] aspect-square">
                     <img
                         src={currentFrame}
                         alt={`Frame ${currentFrameIndex + 1}`}
@@ -217,23 +217,23 @@ const LivePhotoEditor = ({ photoIndex, onClose }) => {
             </div>
 
             {/* Timeline Scrubber */}
-            <div className="shrink-0 px-6 py-4 bg-black/50">
+            <div className="shrink-0 px-4 sm:px-6 py-4 bg-black/50">
                 {/* Time labels with snap button */}
                 <div className="flex justify-between items-center text-white/60 text-xs mb-2 font-mono">
                     <span>-2.0s</span>
                     <button
                         onClick={() => setCurrentFrameIndex(snapIndex)}
-                        className="text-cute-pink font-bold hover:bg-cute-pink hover:text-white px-3 py-1 rounded-full transition-colors"
+                        className="text-cute-pink font-bold hover:bg-cute-pink hover:text-white px-3 py-2 sm:py-1 rounded-full transition-colors min-h-[44px] sm:min-h-0"
                     >
                         ● SNAP
                     </button>
                     <span>+2.0s</span>
                 </div>
 
-                {/* Timeline track */}
+                {/* Timeline track - taller on mobile for easier touch */}
                 <div
                     ref={timelineRef}
-                    className="relative h-16 bg-white/10 rounded-xl overflow-hidden cursor-pointer"
+                    className="relative h-20 sm:h-16 bg-white/10 rounded-xl overflow-hidden cursor-pointer touch-none"
                     onMouseDown={handleMouseDown}
                     onTouchStart={handleTouchStart}
                 >
@@ -292,16 +292,16 @@ const LivePhotoEditor = ({ photoIndex, onClose }) => {
             </div>
 
             {/* Action Buttons */}
-            <div className="shrink-0 p-6 flex gap-4">
+            <div className="shrink-0 p-4 sm:p-6 flex gap-3 sm:gap-4">
                 <button
                     onClick={handleCancel}
-                    className="flex-1 py-4 bg-white/10 text-white font-bold rounded-xl hover:bg-white/20 transition-colors"
+                    className="flex-1 py-4 bg-white/10 text-white font-bold rounded-xl hover:bg-white/20 transition-colors min-h-[48px]"
                 >
                     Cancel
                 </button>
                 <button
                     onClick={handleConfirm}
-                    className="flex-1 py-4 bg-cute-pink text-white font-bold rounded-xl hover:bg-pink-400 transition-colors shadow-lg"
+                    className="flex-1 py-4 bg-cute-pink text-white font-bold rounded-xl hover:bg-pink-400 transition-colors shadow-lg min-h-[48px]"
                 >
                     Use This Frame
                 </button>

@@ -451,9 +451,9 @@ const Studio = () => {
                 </div>
             </Motion.div>
 
-            {/* Sidebar / Controls */}
+            {/* Sidebar / Controls - Desktop */}
             <Motion.div
-                className="w-full md:w-80 bg-white border-l border-gray-200 flex flex-col shrink-0 z-10"
+                className="hidden md:flex w-80 bg-white border-l border-gray-200 flex-col shrink-0 z-10"
                 animate={{
                     x: isEditing ? 100 : 0,
                     opacity: isEditing ? 0.3 : 1
@@ -471,7 +471,7 @@ const Studio = () => {
                     )}
                 </div>
 
-                {/* Sticker Grid */}
+                {/* Sticker Grid - Desktop */}
                 <div className="flex-1 overflow-y-scroll p-4 grid grid-cols-3 gap-4 content-start">
                     {stickerList.map((src, i) => (
                         <Motion.div
@@ -481,14 +481,14 @@ const Studio = () => {
                             className="aspect-square bg-gray-50 rounded-xl p-2 hover:bg-pink-50 transition-colors cursor-grab active:cursor-grabbing"
                             draggable="true"
                             onDragStart={(e) => handleDragStart(e, src)}
-                            onClick={() => addSticker(src)} // Keep click to add as well
+                            onClick={() => addSticker(src)}
                         >
                             <img src={src} alt="Sticker" className="w-full h-full object-contain pointer-events-none" />
                         </Motion.div>
                     ))}
                 </div>
 
-                {/* Actions */}
+                {/* Actions - Desktop */}
                 <div className="p-6 border-t border-gray-100 flex flex-col gap-3">
                     <button
                         onClick={() => setCapturedImageIsMirrored(!capturedImageIsMirrored)}
@@ -510,6 +510,55 @@ const Studio = () => {
                         className="w-full py-3 bg-gray-100 text-gray-600 font-bold rounded-xl hover:bg-gray-200 transition-colors"
                     >
                         Retake Photo
+                    </button>
+                </div>
+            </Motion.div>
+
+            {/* Mobile Bottom Bar with Stickers + Actions */}
+            <Motion.div
+                className="flex md:hidden flex-col bg-white border-t border-gray-200 shrink-0 z-10"
+                animate={{
+                    y: isEditing ? 100 : 0,
+                    opacity: isEditing ? 0.3 : 1
+                }}
+                transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+            >
+                {/* Horizontal Sticker Scroll */}
+                <div className="flex overflow-x-auto gap-3 p-3 border-b border-gray-100">
+                    {stickerList.map((src, i) => (
+                        <Motion.div
+                            key={i}
+                            whileTap={{ scale: 0.9 }}
+                            className="w-14 h-14 shrink-0 bg-gray-50 rounded-xl p-1.5 active:bg-pink-50 transition-colors"
+                            onClick={() => addSticker(src)}
+                        >
+                            <img src={src} alt="Sticker" className="w-full h-full object-contain" />
+                        </Motion.div>
+                    ))}
+                </div>
+
+                {/* Mobile Action Buttons - Compact Row */}
+                <div className="flex gap-2 p-3">
+                    <button
+                        onClick={() => setCapturedImageIsMirrored(!capturedImageIsMirrored)}
+                        className={`flex-1 py-3 font-bold rounded-xl transition-colors text-sm min-h-[48px] ${capturedImageIsMirrored
+                            ? 'bg-cute-pink text-white'
+                            : 'bg-white border-2 border-cute-pink text-cute-pink'
+                            }`}
+                    >
+                        {capturedImageIsMirrored ? '✓ Flip' : 'Flip'}
+                    </button>
+                    <button
+                        onClick={handleDownload}
+                        className="flex-1 py-3 bg-cute-pink text-white font-bold rounded-xl shadow-lg text-sm min-h-[48px]"
+                    >
+                        Download
+                    </button>
+                    <button
+                        onClick={() => setPhase('BOOTH')}
+                        className="flex-1 py-3 bg-gray-100 text-gray-600 font-bold rounded-xl text-sm min-h-[48px]"
+                    >
+                        Retake
                     </button>
                 </div>
             </Motion.div>
