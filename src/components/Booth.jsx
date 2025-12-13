@@ -5,6 +5,7 @@ import { useStore } from '../store';
 import { uploadPhoto, uploadLivePhotoCapture, generateSessionId } from '../lib/supabase';
 import { calculateStripLayout } from '../utils/stripLayout';
 import useLivePhotoBuffer from '../hooks/useLivePhotoBuffer';
+import useAudio from '../hooks/useAudio';
 
 const Booth = ({ hideUI = false }) => {
     const webcamRef = useRef(null);
@@ -28,6 +29,9 @@ const Booth = ({ hideUI = false }) => {
     }), [isMirrored]);
 
     const livePhotoBuffer = useLivePhotoBuffer(webcamRef, bufferOptions);
+
+    // Audio hook for reliable sound playback (preloads and handles browser autoplay policies)
+    const { playSound: playSoundFromHook, unlockAudio } = useAudio();
 
     const [isCountingDown, setIsCountingDown] = useState(false);
     const [count, setCount] = useState(3);
@@ -66,9 +70,9 @@ const Booth = ({ hideUI = false }) => {
     // Helper to sleep
     const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
+    // Use the hook-based playSound
     const playSound = (type) => {
-        const audio = new Audio(type === 'shutter' ? '/sounds/shutter.wav' : '/sounds/beep.wav');
-        audio.play().catch(e => console.log('Audio play failed', e));
+        playSoundFromHook(type);
     };
 
     // NOTE: capture data is stored unmirrored. Mirroring should be handled at display time.
@@ -91,6 +95,9 @@ const Booth = ({ hideUI = false }) => {
 
 
     const handleStartStrip = async () => {
+        // Unlock audio on user interaction (required for browser autoplay policies)
+        await unlockAudio();
+
         // reset landed state and live photo state for new capture sequence
         setLandedShots([false, false, false]);
         resetLivePhotoState();
@@ -256,6 +263,9 @@ const Booth = ({ hideUI = false }) => {
     // Single photo capture for retake mode - captures one photo and replaces at specified index
     const handleSinglePhotoCapture = async (targetIndex) => {
         if (targetIndex === null || targetIndex === undefined || targetIndex < 0 || targetIndex >= 3) return;
+
+        // Unlock audio on user interaction (required for browser autoplay policies)
+        await unlockAudio();
 
         // Generate unique session ID for retake
         const retakeSessionId = generateSessionId();
