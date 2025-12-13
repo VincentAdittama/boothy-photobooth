@@ -1,4 +1,4 @@
-import { useRef, useCallback, useState } from 'react';
+import { useRef, useCallback, useState, useMemo } from 'react';
 
 /**
  * Hook for capturing "Live Photo" style frame buffers.
@@ -122,85 +122,102 @@ const useLivePhotoBuffer = (webcamRef, options = {}) => {
             }
 
             // Extract "before" frames in correct chronological order
-            const beforeFrames = [];
             const currentIdx = bufferIndexRef.current;
+            const rawBefore = [];
             for (let i = 0; i < framesPerBuffer; i++) {
                 const idx = (currentIdx + i) % framesPerBuffer;
-                const frame = bufferRef.current[idx];
-                if (frame) {
-                    beforeFrames.push(frame);
-                }
+                rawBefore.push(bufferRef.current[idx] || null);
             }
 
-            // Pad if we don't have enough frames yet
-            while (beforeFrames.length < framesPerBuffer) {
-                beforeFrames.unshift(beforeFrames[0] || null);
+            // If we have no prior frames (startup), capture a fallback frame
+            let beforeFrames = [];
+            const nonNull = rawBefore.filter(Boolean);
+            if (nonNull.length === 0) {
+                const fallback = captureFrame() || webcamRef.current?.getScreenshot() || null;
+                beforeFrames = new Array(framesPerBuffer).fill(fallback);
+            } else {
+                // Use the most recent available frame to replace any nulls so we don't get blanks
+                const latest = nonNull[nonNull.length - 1];
+                beforeFrames = rawBefore.map((f) => f || latest);
             }
 
             // Capture the snap moment at full resolution
+            // We capture this synchronously(ish) so it's the specific moment user clicked
             let snapFrame = webcamRef.current?.getScreenshot();
 
-            const continueWithSnap = (snap) => {
-                // Now capture "after" frames
-                const afterFrames = [];
-                let afterCaptureCount = 0;
+            // Prepare a promise to handle the potentially async processing of the snap (unmirroring)
+            // This runs in PARALLEL with the after-frame capture loop
+            const processSnapPromise = new Promise((resolveSnap) => {
+                if (snapFrame && isMirroredRef.current) {
+                    unmirrorDataURL(snapFrame).then((unsnap) => {
+                        resolveSnap(unsnap);
+                    }).catch((e) => {
+                        console.warn('Failed to unmirror snapFrame', e);
+                        resolveSnap(snapFrame);
+                    });
+                } else {
+                    resolveSnap(snapFrame);
+                }
+            });
 
-                const afterInterval = setInterval(() => {
+            // Start capturing "after" frames IMMEDIATELY
+            const afterFramesPromise = new Promise((resolveAfter) => {
+                const frames = [];
+                let count = 0;
+
+                // Use a standard interval for capturing
+                const afterId = setInterval(() => {
                     const frame = captureFrame();
                     if (frame) {
-                        afterFrames.push(frame);
+                        frames.push(frame);
                     }
-                    afterCaptureCount++;
+                    count++;
 
-                    if (afterCaptureCount >= framesPerBuffer) {
-                        clearInterval(afterInterval);
-                        setIsCapturing(false);
+                    if (count >= framesPerBuffer) {
+                        clearInterval(afterId);
 
-                        // Pad after frames if needed
-                        while (afterFrames.length < framesPerBuffer) {
-                            afterFrames.push(afterFrames[afterFrames.length - 1] || snap);
+                        // Pad if needed (unlikely if interval works well, but safe)
+                        while (frames.length < framesPerBuffer) {
+                            frames.push(frames[frames.length - 1] || null);
                         }
-
-                        // Combine: before + snap + after (snap replaces center frame)
-                        const allFrames = [...beforeFrames, ...afterFrames];
-                        // Replace center frame with high-res snap
-                        const snapIndex = framesPerBuffer; // First frame of "after" is the snap moment
-                        if (snap) {
-                            allFrames[snapIndex] = snap;
-                        }
-
-                        // Resume continuous buffering for next shot
-                        bufferRef.current = new Array(framesPerBuffer).fill(null);
-                        bufferIndexRef.current = 0;
-                        intervalIdRef.current = setInterval(() => {
-                            const f = captureFrame();
-                            if (f) {
-                                bufferRef.current[bufferIndexRef.current] = f;
-                                bufferIndexRef.current = (bufferIndexRef.current + 1) % framesPerBuffer;
-                            }
-                        }, intervalMs);
-
-                        resolve({
-                            frames: allFrames,
-                            snapIndex: snapIndex,
-                            snapFrame: snap
-                        });
+                        resolveAfter(frames);
                     }
                 }, intervalMs);
-            };
+            });
 
-            if (snapFrame && isMirroredRef.current) {
-                unmirrorDataURL(snapFrame).then((unsnap) => {
-                    continueWithSnap(unsnap);
-                }).catch((e) => {
-                    console.warn('Failed to unmirror snapFrame', e);
-                    continueWithSnap(snapFrame);
+            // Wait for BOTH the capture loop AND the image processing to finish
+            Promise.all([processSnapPromise, afterFramesPromise]).then(([processedSnap, afterFrames]) => {
+                setIsCapturing(false);
+
+                // Final assembly
+                // Pad after frames with snap if they ended up null (fallback)
+                const finalAfterFrames = afterFrames.map(f => f || processedSnap);
+
+                // Combine: before + snap + after
+                const allFrames = [...beforeFrames, ...finalAfterFrames];
+
+                // Insert the high-res snap at the junction point
+                // (Index = framesPerBuffer). This effectively replaces the first "after" frame 
+                // or sits between before and after. 
+                // In the previous logic, it replaced the element at index `framesPerBuffer`.
+                const snapIndex = framesPerBuffer;
+                if (processedSnap) {
+                    allFrames[snapIndex] = processedSnap;
+                }
+
+                // Resume continuous buffering for next shot
+                bufferRef.current = beforeFrames.slice();
+                bufferIndexRef.current = 0;
+                startBuffering(); // Re-use startBuffering logic
+
+                resolve({
+                    frames: allFrames,
+                    snapIndex: snapIndex,
+                    snapFrame: processedSnap
                 });
-            } else {
-                continueWithSnap(snapFrame);
-            }
+            });
         });
-    }, [webcamRef, captureFrame, framesPerBuffer, intervalMs, unmirrorDataURL]);
+    }, [webcamRef, captureFrame, framesPerBuffer, intervalMs, unmirrorDataURL, startBuffering]);
 
     // Get current buffer state (for debugging)
     const getBufferState = useCallback(() => ({
@@ -210,7 +227,7 @@ const useLivePhotoBuffer = (webcamRef, options = {}) => {
         isCapturing
     }), [framesPerBuffer, isBuffering, isCapturing]);
 
-    return {
+    return useMemo(() => ({
         startBuffering,
         stopBuffering,
         captureWithBuffer,
@@ -218,8 +235,20 @@ const useLivePhotoBuffer = (webcamRef, options = {}) => {
         isBuffering,
         isCapturing,
         totalFrames,
-        snapIndex: framesPerBuffer // The index of the snap moment in the final array
-    };
+        snapIndex: framesPerBuffer, // The index of the snap moment in the final array
+        framesPerBuffer,
+        fps
+    }), [
+        startBuffering,
+        stopBuffering,
+        captureWithBuffer,
+        getBufferState,
+        isBuffering,
+        isCapturing,
+        totalFrames,
+        framesPerBuffer,
+        fps
+    ]);
 };
 
 export default useLivePhotoBuffer;

@@ -16,13 +16,15 @@ const Booth = ({ hideUI = false }) => {
     } = useStore();
 
     // Live Photo buffer hook - captures frames before and after each snap
-    const livePhotoBuffer = useLivePhotoBuffer(webcamRef, {
+    const bufferOptions = React.useMemo(() => ({
         fps: 12,
         duration: 2,
         quality: 0.5,
         scale: 0.5,
         isMirrored: isMirrored  // Pass current mirror state to ensure consistency
-    });
+    }), [isMirrored]);
+
+    const livePhotoBuffer = useLivePhotoBuffer(webcamRef, bufferOptions);
 
     const [isCountingDown, setIsCountingDown] = useState(false);
     const [count, setCount] = useState(3);
@@ -96,7 +98,9 @@ const Booth = ({ hideUI = false }) => {
         // Ensure live photo buffering is active
         if (!livePhotoBuffer.isBuffering) {
             livePhotoBuffer.startBuffering();
-            await delay(500); // Give buffer time to warm up
+            // Wait for buffer warm-up equal to configured duration (plus small margin)
+            const warmMs = (livePhotoBuffer.framesPerBuffer / livePhotoBuffer.fps) * 1000 + 200;
+            await delay(warmMs);
         }
 
         for (let i = 0; i < TOTAL_SHOTS; i++) {
