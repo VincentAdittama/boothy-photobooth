@@ -12,10 +12,10 @@ const Studio = () => {
     const {
         capturedImage, setPhase, capturedImageIsMirrored, setCapturedImageIsMirrored,
         capturedImages, livePhotoFrames,
-        currentlyEditingPhotoIndex, setCurrentlyEditingPhotoIndex, setIsRetakeSelecting
+        currentlyEditingPhotoIndex, setCurrentlyEditingPhotoIndex, setIsRetakeSelecting,
+        stickers, setStickers
     } = useStore();
     const stageRef = useRef(null);
-    const [stickers, setStickers] = useState([]);
     const [selectedId, selectShape] = useState(null);
     const transformerRef = useRef(null);
 
@@ -129,7 +129,7 @@ const Studio = () => {
 
     // Delete sticker by id
     const deleteSticker = (id) => {
-        setStickers(prev => prev.filter(s => s.id !== id));
+        setStickers(stickers.filter(s => s.id !== id));
         selectShape(null);
     };
 

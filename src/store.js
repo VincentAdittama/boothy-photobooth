@@ -27,6 +27,9 @@ export const useStore = create((set) => ({
     selectedFrameIndices: [24, 24, 24], // Default to center frame (the snap moment) for each photo
     currentlyEditingPhotoIndex: null, // Which photo is being edited in the timeline (null = none)
 
+    // Studio stickers state - persists across retakes within same session
+    stickers: [],
+
     setPhase: (phase) => set({ currentPhase: phase }),
     setUserType: (type) => set({ userType: type }),
     setNickname: (name) => set({ nickname: name }),
@@ -64,6 +67,8 @@ export const useStore = create((set) => ({
         )
     })),
     setCurrentlyEditingPhotoIndex: (index) => set({ currentlyEditingPhotoIndex: index }),
+    // Studio stickers actions
+    setStickers: (stickers) => set({ stickers }),
     // Update a specific captured image (used when confirming frame selection)
     updateCapturedImage: (photoIndex, newImageSrc) => set((state) => ({
         capturedImages: state.capturedImages.map((img, i) =>
