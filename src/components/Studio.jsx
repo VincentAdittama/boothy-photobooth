@@ -77,14 +77,8 @@ const Studio = () => {
     useEffect(() => {
         const updateLayout = () => {
             if (containerRef.current) {
-                // Round down to avoid sub-pixel rendering issues (the "hair line" glitch)
-                const width = Math.floor(containerRef.current.offsetWidth);
-
-                // On mobile, calculate available height as viewport minus dock
-                const isMobile = window.innerWidth < 768;
-                const dockHeight = isMobile ? 200 : 0; // Dock + safe area padding
-                const viewportHeight = window.innerHeight;
-                const availableHeight = Math.floor(isMobile ? viewportHeight - dockHeight : containerRef.current.offsetHeight);
+                const width = containerRef.current.offsetWidth;
+                const height = containerRef.current.offsetHeight;
 
                 if (isStrip) {
                     // Reference dimensions from Booth.jsx to ensure WYSIWYG proportions
@@ -93,14 +87,8 @@ const Studio = () => {
                     // padding: var(--strip-padding)
                     // gap: var(--strip-padding)
 
-                    const calculated = calculateStripLayout(width, availableHeight, capturedImages.length);
-                    // Floor all dimensions to prevent sub-pixel hairline artifacts
-                    setLayout({
-                        ...calculated,
-                        width: Math.floor(calculated.width),
-                        height: Math.floor(calculated.height),
-                        photoSize: Math.floor(calculated.photoSize)
-                    });
+                    const calculated = calculateStripLayout(width, height, capturedImages.length);
+                    setLayout(calculated);
 
                 } else {
                     // Single square photo logic
@@ -336,8 +324,8 @@ const Studio = () => {
 
             {/* Main Canvas Area - takes remaining space after bottom controls on mobile */}
             <Motion.div
-                className="flex-1 min-h-0 relative flex items-start md:items-center justify-center overflow-hidden pb-[180px] md:pb-0"
-                style={{ padding: 'var(--strip-padding)', paddingBottom: 'calc(var(--strip-padding) + 160px)' }}
+                className="flex-1 min-h-0 relative bg-checkered flex items-center justify-center overflow-hidden"
+                style={{ padding: 'var(--strip-padding)' }}
                 ref={containerRef}
                 onDrop={handleDrop}
                 onDragOver={handleDragOver}
@@ -535,77 +523,52 @@ const Studio = () => {
                 </div>
             </Motion.div>
 
+            {/* Mobile Bottom Bar with Stickers + Actions */}
             <Motion.div
-                className="flex md:hidden flex-col items-center justify-end fixed bottom-0 left-0 right-0 z-[1000] pointer-events-none pb-[calc(env(safe-area-inset-bottom)+5px)]"
-                initial={{ y: 200 }}
+                className="flex md:hidden flex-col bg-white border-t border-gray-200 shrink-0 z-10"
                 animate={{
-                    y: isEditing ? 200 : 0,
-                    opacity: isEditing ? 0 : 1
+                    y: isEditing ? 100 : 0,
+                    opacity: isEditing ? 0.3 : 1
                 }}
                 transition={{ type: 'spring', stiffness: 300, damping: 30 }}
             >
-                {/* Glassmorphism Container */}
-                <div className="w-[95%] max-w-sm mb-2 bg-white/80 backdrop-blur-xl border border-white/40 shadow-2xl rounded-3xl overflow-hidden pointer-events-auto ring-1 ring-black/5">
-
-                    {/* Sticker Scroll */}
-                    <div className="flex overflow-x-auto gap-4 p-4 scrollbar-hide snap-x">
-                        {stickerList.map((src, i) => (
-                            <Motion.div
-                                key={i}
-                                whileTap={{ scale: 0.85 }}
-                                className="w-16 h-16 shrink-0 bg-white/60 rounded-2xl p-2 shadow-sm snap-center border border-white/50 active:bg-pink-100 transition-colors"
-                                onClick={() => {
-                                    if (typeof navigator.vibrate === 'function') navigator.vibrate(5);
-                                    addSticker(src);
-                                }}
-                            >
-                                <img src={src} alt="Sticker" className="w-full h-full object-contain pointer-events-none select-none" />
-                            </Motion.div>
-                        ))}
-                    </div>
-
-                    {/* Separator */}
-                    <div className="h-px w-full bg-linear-to-r from-transparent via-gray-200 to-transparent" />
-
-                    {/* Action Buttons */}
-                    <div className="flex p-3 gap-3">
-                        <Motion.button
-                            whileTap={{ scale: 0.95 }}
-                            onClick={() => {
-                                if (typeof navigator.vibrate === 'function') navigator.vibrate(10);
-                                setCapturedImageIsMirrored(!capturedImageIsMirrored);
-                            }}
-                            className={`flex-1 py-4 font-bold rounded-2xl text-sm transition-all shadow-sm ${capturedImageIsMirrored
-                                ? 'bg-cute-pink text-white shadow-pink-200'
-                                : 'bg-white text-cute-pink border border-pink-100'
-                                }`}
+                {/* Horizontal Sticker Scroll */}
+                <div className="flex overflow-x-auto gap-3 p-3 border-b border-gray-100">
+                    {stickerList.map((src, i) => (
+                        <Motion.div
+                            key={i}
+                            whileTap={{ scale: 0.9 }}
+                            className="w-14 h-14 shrink-0 bg-gray-50 rounded-xl p-1.5 active:bg-pink-50 transition-colors"
+                            onClick={() => addSticker(src)}
                         >
-                            {capturedImageIsMirrored ? '✓ Flipped' : 'Flip'}
-                        </Motion.button>
+                            <img src={src} alt="Sticker" className="w-full h-full object-contain" />
+                        </Motion.div>
+                    ))}
+                </div>
 
-                        <Motion.button
-                            whileTap={{ scale: 0.95 }}
-                            onClick={() => {
-                                if (typeof navigator.vibrate === 'function') navigator.vibrate(10);
-                                handleDownload();
-                            }}
-                            className="flex-1 py-4 bg-gray-900/90 text-white font-bold rounded-2xl shadow-lg shadow-gray-200 text-sm backdrop-blur-sm"
-                        >
-                            Save
-                        </Motion.button>
-
-                        <Motion.button
-                            whileTap={{ scale: 0.95 }}
-                            onClick={() => {
-                                if (typeof navigator.vibrate === 'function') navigator.vibrate(10);
-                                setIsRetakeSelecting(true);
-                                setPhase('BOOTH');
-                            }}
-                            className="w-14 flex items-center justify-center bg-gray-100 text-gray-500 font-bold rounded-2xl shadow-inner hover:bg-gray-200"
-                        >
-                            <span className="text-xl">↺</span>
-                        </Motion.button>
-                    </div>
+                {/* Mobile Action Buttons - Compact Row */}
+                <div className="flex gap-2 p-3">
+                    <button
+                        onClick={() => setCapturedImageIsMirrored(!capturedImageIsMirrored)}
+                        className={`flex-1 py-3 font-bold rounded-xl transition-colors text-sm min-h-[48px] ${capturedImageIsMirrored
+                            ? 'bg-cute-pink text-white'
+                            : 'bg-white border-2 border-cute-pink text-cute-pink'
+                            }`}
+                    >
+                        {capturedImageIsMirrored ? '✓ Flip' : 'Flip'}
+                    </button>
+                    <button
+                        onClick={handleDownload}
+                        className="flex-1 py-3 bg-cute-pink text-white font-bold rounded-xl shadow-lg text-sm min-h-[48px]"
+                    >
+                        Download
+                    </button>
+                    <button
+                        onClick={() => { setIsRetakeSelecting(true); setPhase('BOOTH'); }}
+                        className="flex-1 py-3 bg-gray-100 text-gray-600 font-bold rounded-xl text-sm min-h-[48px]"
+                    >
+                        Retake
+                    </button>
                 </div>
             </Motion.div>
 
