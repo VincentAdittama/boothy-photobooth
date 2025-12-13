@@ -73,36 +73,45 @@ const Studio = () => {
         return () => window.removeEventListener('mousemove', handleMouseMove);
     }, [layout.width, layout.height]);
 
+    // Recalculate layout on mount and resize
     useEffect(() => {
-        if (containerRef.current) {
+        const updateLayout = () => {
+            if (containerRef.current) {
+                const width = containerRef.current.offsetWidth;
+                const height = containerRef.current.offsetHeight;
 
-            const width = containerRef.current.offsetWidth;
-            const height = containerRef.current.offsetHeight;
+                if (isStrip) {
+                    // Reference dimensions from Booth.jsx to ensure WYSIWYG proportions
+                    // Booth uses w-28 (112px) for photos
+                    // border-4 (4px) for outer border
+                    // padding: var(--strip-padding)
+                    // gap: var(--strip-padding)
 
-            if (isStrip) {
-                // Reference dimensions from Booth.jsx to ensure WYSIWYG proportions
-                // Booth uses w-28 (112px) for photos
-                // border-4 (4px) for outer border
-                // padding: var(--strip-padding)
-                // gap: var(--strip-padding)
+                    const calculated = calculateStripLayout(width, height, capturedImages.length);
+                    setLayout(calculated);
 
-                const calculated = calculateStripLayout(width, height, capturedImages.length);
-                setLayout(calculated);
-
-            } else {
-                // Single square photo logic
-                const PAD = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--strip-padding')) || 20;
-                const size = Math.min(width, height) - (2 * PAD);
-                setLayout({
-                    width: size,
-                    height: size,
-                    photoSize: size,
-                    pad: 0,
-                    border: 0,
-                    gap: 0
-                });
+                } else {
+                    // Single square photo logic
+                    const PAD = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--strip-padding')) || 20;
+                    const size = Math.min(width, height) - (2 * PAD);
+                    setLayout({
+                        width: size,
+                        height: size,
+                        photoSize: size,
+                        pad: 0,
+                        border: 0,
+                        gap: 0
+                    });
+                }
             }
-        }
+        };
+
+        // Initial layout calculation
+        updateLayout();
+
+        // Recalculate on window resize
+        window.addEventListener('resize', updateLayout);
+        return () => window.removeEventListener('resize', updateLayout);
     }, [capturedImages, isStrip]);
 
     // Attach transformer to selected node
@@ -311,11 +320,11 @@ const Studio = () => {
     };
 
     return (
-        <div className="h-full w-full bg-gray-100 flex flex-col md:flex-row overflow-y-auto">
+        <div className="h-screen max-h-screen md:h-full md:max-h-full w-full bg-gray-100 flex flex-col md:flex-row overflow-hidden">
 
-            {/* Main Canvas Area */}
+            {/* Main Canvas Area - takes remaining space after bottom controls on mobile */}
             <Motion.div
-                className="flex-1 relative bg-checkered flex items-center justify-center"
+                className="flex-1 min-h-0 relative bg-checkered flex items-center justify-center overflow-hidden"
                 style={{ padding: 'var(--strip-padding)' }}
                 ref={containerRef}
                 onDrop={handleDrop}
