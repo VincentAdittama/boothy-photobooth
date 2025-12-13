@@ -42,16 +42,27 @@ const LivePhotoEditor = ({ photoIndex, onClose }) => {
 
     const currentFrame = frames[currentFrameIndex] || capturedImages[photoIndex];
 
-    // Handle timeline scrubbing
+    // Handle timeline scrubbing - inverse of the progress calculation
+    // Maps click position to frame index with snapIndex at 50%
     const handleTimelineInteraction = useCallback((clientX) => {
         if (!timelineRef.current || frames.length === 0) return;
 
         const rect = timelineRef.current.getBoundingClientRect();
         const x = clientX - rect.left;
-        const percentage = Math.max(0, Math.min(1, x / rect.width));
-        const frameIndex = Math.floor(percentage * (frames.length - 1));
-        setCurrentFrameIndex(frameIndex);
-    }, [frames.length]);
+        const percentage = Math.max(0, Math.min(1, x / rect.width)) * 100; // 0-100
+
+        let frameIndex;
+        if (percentage <= 50) {
+            // Map [0%, 50%] to [0, snapIndex]
+            frameIndex = Math.round((percentage / 50) * snapIndex);
+        } else {
+            // Map [50%, 100%] to [snapIndex, frames.length-1]
+            const afterSnapFrames = frames.length - 1 - snapIndex;
+            frameIndex = Math.round(snapIndex + ((percentage - 50) / 50) * afterSnapFrames);
+        }
+
+        setCurrentFrameIndex(Math.max(0, Math.min(frames.length - 1, frameIndex)));
+    }, [frames.length, snapIndex]);
 
     // Playback controls
     const startPlayback = () => {
@@ -81,6 +92,7 @@ const LivePhotoEditor = ({ photoIndex, onClose }) => {
     };
 
     const handleMouseDown = useCallback((e) => {
+        e.preventDefault();
         setIsDragging(true);
         stopPlayback();
         handleTimelineInteraction(e.clientX);
@@ -88,6 +100,7 @@ const LivePhotoEditor = ({ photoIndex, onClose }) => {
 
     const handleMouseMove = useCallback((e) => {
         if (isDragging) {
+            e.preventDefault();
             handleTimelineInteraction(e.clientX);
         }
     }, [isDragging, handleTimelineInteraction]);
@@ -97,6 +110,7 @@ const LivePhotoEditor = ({ photoIndex, onClose }) => {
     }, [setIsDragging]);
 
     const handleTouchStart = useCallback((e) => {
+        e.preventDefault();
         setIsDragging(true);
         stopPlayback();
         handleTimelineInteraction(e.touches[0].clientX);
@@ -104,6 +118,7 @@ const LivePhotoEditor = ({ photoIndex, onClose }) => {
 
     const handleTouchMove = useCallback((e) => {
         if (isDragging) {
+            e.preventDefault();
             handleTimelineInteraction(e.touches[0].clientX);
         }
     }, [isDragging, handleTimelineInteraction]);
@@ -152,10 +167,22 @@ const LivePhotoEditor = ({ photoIndex, onClose }) => {
         onClose();
     };
 
-    // Calculate progress percentage
-    const progressPercentage = frames.length > 0
-        ? (currentFrameIndex / (frames.length - 1)) * 100
-        : 50;
+    // Calculate progress percentage - normalized so snapIndex is always at exactly 50%
+    // We use two-segment linear interpolation:
+    // - Frames 0 to snapIndex map to 0% to 50%
+    // - Frames snapIndex to (length-1) map to 50% to 100%
+    const calculateProgress = () => {
+        if (frames.length === 0) return 50;
+        if (currentFrameIndex <= snapIndex) {
+            // Map [0, snapIndex] to [0%, 50%]
+            return (currentFrameIndex / snapIndex) * 50;
+        } else {
+            // Map [snapIndex, frames.length-1] to [50%, 100%]
+            const afterSnapFrames = frames.length - 1 - snapIndex;
+            return 50 + ((currentFrameIndex - snapIndex) / afterSnapFrames) * 50;
+        }
+    };
+    const progressPercentage = calculateProgress();
 
     const timeOffset = getTimeOffset(currentFrameIndex);
     const timeDisplay = parseFloat(timeOffset) >= 0 ? `+${timeOffset}s` : `${timeOffset}s`;
@@ -181,7 +208,7 @@ const LivePhotoEditor = ({ photoIndex, onClose }) => {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 bg-black/95 flex flex-col"
+            className={`fixed inset-0 z-50 bg-black/95 flex flex-col ${isDragging ? 'select-none' : ''}`}
         >
             {/* Header */}
             <div className="shrink-0 p-4 flex items-center justify-between">
@@ -229,45 +256,48 @@ const LivePhotoEditor = ({ photoIndex, onClose }) => {
                     <span>+2.0s</span>
                 </div>
 
-                {/* Timeline track - taller on mobile for easier touch */}
-                <div
-                    ref={timelineRef}
-                    className="relative h-20 sm:h-16 bg-white/10 rounded-xl overflow-hidden cursor-pointer touch-none"
-                    onMouseDown={handleMouseDown}
-                    onTouchStart={handleTouchStart}
-                >
-                    {/* Frame thumbnails (show every 4th frame for performance) */}
-                    <div className="absolute inset-0 flex">
-                        {frames.filter((_, i) => i % 4 === 0).map((frame, i) => (
-                            <div
-                                key={i}
-                                className="flex-1 h-full"
-                                style={{
-                                    backgroundImage: `url(${frame})`,
-                                    backgroundSize: 'cover',
-                                    backgroundPosition: 'center',
-                                    opacity: 0.6,
-                                    transform: shouldFlip ? 'scaleX(-1)' : 'none'
-                                }}
-                            />
-                        ))}
+                {/* Timeline track container - wraps both the track and handle */}
+                <div className="relative">
+                    {/* Timeline track - taller on mobile for easier touch */}
+                    <div
+                        ref={timelineRef}
+                        className="relative h-20 sm:h-16 bg-white/10 rounded-xl overflow-hidden cursor-pointer touch-none"
+                        onMouseDown={handleMouseDown}
+                        onTouchStart={handleTouchStart}
+                    >
+                        {/* Frame thumbnails (show every 4th frame for performance) */}
+                        <div className="absolute inset-0 flex">
+                            {frames.filter((_, i) => i % 4 === 0).map((frame, i) => (
+                                <div
+                                    key={i}
+                                    className="flex-1 h-full"
+                                    style={{
+                                        backgroundImage: `url(${frame})`,
+                                        backgroundSize: 'cover',
+                                        backgroundPosition: 'center',
+                                        opacity: 0.6,
+                                        transform: shouldFlip ? 'scaleX(-1)' : 'none'
+                                    }}
+                                />
+                            ))}
+                        </div>
+
+                        {/* Progress fill */}
+                        <div
+                            className="absolute left-0 top-0 h-full bg-cute-pink/30 pointer-events-none"
+                            style={{ width: `${progressPercentage}%` }}
+                        />
+
+                        {/* Snap moment marker */}
+                        <div
+                            className="absolute top-0 h-full w-0.5 bg-cute-pink pointer-events-none"
+                            style={{ left: '50%', transform: 'translateX(-50%)' }}
+                        />
                     </div>
 
-                    {/* Progress fill */}
-                    <div
-                        className="absolute left-0 top-0 h-full bg-cute-pink/30 pointer-events-none"
-                        style={{ width: `${progressPercentage}%` }}
-                    />
-
-                    {/* Snap moment marker */}
-                    <div
-                        className="absolute top-0 h-full w-0.5 bg-cute-pink pointer-events-none"
-                        style={{ left: '50%' }}
-                    />
-
-                    {/* Scrubber handle */}
+                    {/* Scrubber handle - positioned outside overflow container so it doesn't clip */}
                     <Motion.div
-                        className="absolute top-0 h-full flex items-center pointer-events-none"
+                        className="absolute top-0 h-full flex items-center pointer-events-none z-10"
                         style={{ left: `${progressPercentage}%` }}
                         animate={{ x: '-50%' }}
                     >
