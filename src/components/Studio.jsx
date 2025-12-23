@@ -56,6 +56,7 @@ const Studio = () => {
 
   const [isHoveringSticker, setIsHoveringSticker] = useState(false);
   const [isDraggingSticker, setIsDraggingSticker] = useState(false);
+  const [hoveredLivePhotoIndex, setHoveredLivePhotoIndex] = useState(null);
 
   // Mobile detection for trash zones
   const [isMobile, setIsMobile] = useState(false);
@@ -471,18 +472,41 @@ const Studio = () => {
                   const yPos = border + pad + i * (photoSize + gap);
                   const xPos = border + pad;
 
+                  const showLiveHoverOverlay =
+                    hasLivePhotos &&
+                    !isEditing &&
+                    hoveredLivePhotoIndex === i &&
+                    !(isHoveringSticker || isDraggingSticker) &&
+                    livePhotoFrames[i] &&
+                    livePhotoFrames[i].length > 0;
+
                   return (
-                    <URLImage
-                      key={i}
-                      src={src}
-                      name="background"
-                      isBackground={true}
-                      x={capturedImageIsMirrored ? xPos + photoSize : xPos}
-                      scaleX={capturedImageIsMirrored ? -1 : 1}
-                      y={yPos}
-                      width={photoSize}
-                      height={photoSize}
-                    />
+                    <React.Fragment key={i}>
+                      <URLImage
+                        src={src}
+                        name="background"
+                        isBackground={true}
+                        x={capturedImageIsMirrored ? xPos + photoSize : xPos}
+                        scaleX={capturedImageIsMirrored ? -1 : 1}
+                        y={yPos}
+                        width={photoSize}
+                        height={photoSize}
+                      />
+
+                      {/* Hover overlay for Live Photo editing.
+                          Drawn inside the canvas so it sits ABOVE the photo but BELOW stickers. */}
+                      {showLiveHoverOverlay && (
+                        <Rect
+                          x={xPos}
+                          y={yPos}
+                          width={photoSize}
+                          height={photoSize}
+                          fill="black"
+                          opacity={0.1}
+                          listening={false}
+                        />
+                      )}
+                    </React.Fragment>
                   );
                 })}
 
@@ -590,7 +614,7 @@ const Studio = () => {
                     className={`absolute transition-all duration-200 cursor-pointer group ${
                       isHoveringSticker || isDraggingSticker
                         ? "pointer-events-none opacity-0"
-                        : "pointer-events-auto bg-transparent hover:bg-black/10 opacity-100"
+                        : "pointer-events-auto bg-transparent opacity-100"
                     }`}
                     style={{
                       left: xPos,
@@ -599,6 +623,10 @@ const Studio = () => {
                       height: photoSize,
                     }}
                     onClick={() => handlePhotoClick(i)}
+                    onMouseEnter={() => setHoveredLivePhotoIndex(i)}
+                    onMouseLeave={() => setHoveredLivePhotoIndex(null)}
+                    onFocus={() => setHoveredLivePhotoIndex(i)}
+                    onBlur={() => setHoveredLivePhotoIndex(null)}
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
                   >
