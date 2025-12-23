@@ -9,6 +9,7 @@ import useAudio from '../hooks/useAudio';
 
 const Booth = ({ hideUI = false }) => {
     const webcamRef = useRef(null);
+    const captureLockRef = useRef(false);
     const {
         setPhase, setCapturedImage, setCapturedImages, nickname, capturedImages,
         isMirrored, setIsMirrored, capturedImageIsMirrored, appendOriginalCapturedImageIsMirrored, resetOriginalCapturedImageIsMirroredArray, setCapturedImageIsMirrored, setOriginalCapturedImageIsMirrored,
@@ -39,6 +40,7 @@ const Booth = ({ hideUI = false }) => {
     const [isCountingDown, setIsCountingDown] = useState(false);
     const [count, setCount] = useState(3);
     const [isUploading, setIsUploading] = useState(false);
+    const [isCaptureInProgress, setIsCaptureInProgress] = useState(false);
     const [flyingShots, setFlyingShots] = useState([]); // {id, src, init:{l,t}, delta:{x,y}}
     const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' ? window.innerWidth < 1024 : false);
     const holeRefs = [useRef(null), useRef(null), useRef(null)];
@@ -125,35 +127,41 @@ const Booth = ({ hideUI = false }) => {
 
 
     const handleStartStrip = async () => {
+        // Prevent double-triggering (e.g. the brief window between countdown and capture)
+        if (captureLockRef.current) return;
+        captureLockRef.current = true;
+        setIsCaptureInProgress(true);
+
         // Unlock audio on user interaction (required for browser autoplay policies)
-        await unlockAudio();
+        try {
+            await unlockAudio();
 
-        // reset landed state and live photo state for new capture sequence
-        setLandedShots([false, false, false]);
-        resetLivePhotoState();
-        resetOriginalCapturedImageIsMirroredArray();
-        // Clear retake state to hide the glow effect during transition
-        clearRetakeState();
-        const shots = [];
-        const fullResShots = []; // Full resolution for Supabase upload
-        const allLiveFrames = [];
-        const TOTAL_SHOTS = 3;
+            // reset landed state and live photo state for new capture sequence
+            setLandedShots([false, false, false]);
+            resetLivePhotoState();
+            resetOriginalCapturedImageIsMirroredArray();
+            // Clear retake state to hide the glow effect during transition
+            clearRetakeState();
+            const shots = [];
+            const fullResShots = []; // Full resolution for Supabase upload
+            const allLiveFrames = [];
+            const TOTAL_SHOTS = 3;
 
-        // Generate unique session ID for this capture sequence
-        const sessionId = generateSessionId();
+            // Generate unique session ID for this capture sequence
+            const sessionId = generateSessionId();
 
-        // Ensure live photo buffering is active
-        if (!livePhotoBuffer.isBuffering) {
-            livePhotoBuffer.startBuffering();
-            // Wait for buffer warm-up equal to configured duration (plus small margin)
-            const warmMs = (livePhotoBuffer.framesPerBuffer / livePhotoBuffer.fps) * 1000 + 200;
-            await delay(warmMs);
-        }
+            // Ensure live photo buffering is active
+            if (!livePhotoBuffer.isBuffering) {
+                livePhotoBuffer.startBuffering();
+                // Wait for buffer warm-up equal to configured duration (plus small margin)
+                const warmMs = (livePhotoBuffer.framesPerBuffer / livePhotoBuffer.fps) * 1000 + 200;
+                await delay(warmMs);
+            }
 
-        // Initialize view state to match booth preference at START of capture
-        setCapturedImageIsMirrored(isMirrored);
+            // Initialize view state to match booth preference at START of capture
+            setCapturedImageIsMirrored(isMirrored);
 
-        for (let i = 0; i < TOTAL_SHOTS; i++) {
+            for (let i = 0; i < TOTAL_SHOTS; i++) {
             // Countdown
             setIsCountingDown(true);
             for (let c = 3; c > 0; c--) {
@@ -245,13 +253,13 @@ const Booth = ({ hideUI = false }) => {
             }
         }
 
-        // Store all live photo frames
-        setLivePhotoFrames(allLiveFrames);
+            // Store all live photo frames
+            setLivePhotoFrames(allLiveFrames);
 
-        // Done capturing
-        if (shots.length > 0) {
-            setCapturedImages(shots);
-            setCapturedImage(shots[0]); // Set first as preview or primary
+            // Done capturing
+            if (shots.length > 0) {
+                setCapturedImages(shots);
+                setCapturedImage(shots[0]); // Set first as preview or primary
 
             // Meta info
             // setCapturedImageIsMirrored(isMirrored); // Already set at start
@@ -313,6 +321,12 @@ const Booth = ({ hideUI = false }) => {
                 console.error('Transition failed', e);
                 setIsTransitioning(false);
             }
+            }
+        } finally {
+            // Always clear the lock/state, even if capture/upload/transition throws.
+            setIsCountingDown(false);
+            setIsCaptureInProgress(false);
+            captureLockRef.current = false;
         }
     };
 
@@ -320,53 +334,59 @@ const Booth = ({ hideUI = false }) => {
     const handleSinglePhotoCapture = async (targetIndex) => {
         if (targetIndex === null || targetIndex === undefined || targetIndex < 0 || targetIndex >= 3) return;
 
+        // Prevent double-triggering during retake captures
+        if (captureLockRef.current) return;
+        captureLockRef.current = true;
+        setIsCaptureInProgress(true);
+
         // Unlock audio on user interaction (required for browser autoplay policies)
-        await unlockAudio();
+        try {
+            await unlockAudio();
 
-        // Generate unique session ID for retake
-        const retakeSessionId = generateSessionId();
+            // Generate unique session ID for retake
+            const retakeSessionId = generateSessionId();
 
-        // Ensure live photo buffering is active
-        if (!livePhotoBuffer.isBuffering) {
-            livePhotoBuffer.startBuffering();
-            const warmMs = (livePhotoBuffer.framesPerBuffer / livePhotoBuffer.fps) * 1000 + 200;
-            await delay(warmMs);
-        }
-
-        // Add delay before countdown (like regular mode)
-        await delay(500);
-
-        // Countdown
-        setIsCountingDown(true);
-        for (let c = 3; c > 0; c--) {
-            setCount(c);
-            playSound('beep');
-            await delay(1000);
-        }
-        setIsCountingDown(false);
-
-        // Flash effect
-        if (isFlashEnabled) {
-            setIsFlashing(true);
-            setTimeout(() => setIsFlashing(false), 250);
-        }
-        playSound('shutter');
-
-        await delay(200);
-
-        // Capture snap frame
-        const liveResultPromise = livePhotoBuffer.captureWithBuffer();
-        let shot = webcamRef.current.getScreenshot();
-        let fullResShot = shot; // Keep original full resolution for storage
-
-        if (shot && isMirrored) {
-            try {
-                shot = await unmirrorDataURL(shot);
-                fullResShot = shot; // Unmirrored full res for storage
-            } catch (e) {
-                console.warn('Failed to unmirror shot', e);
+            // Ensure live photo buffering is active
+            if (!livePhotoBuffer.isBuffering) {
+                livePhotoBuffer.startBuffering();
+                const warmMs = (livePhotoBuffer.framesPerBuffer / livePhotoBuffer.fps) * 1000 + 200;
+                await delay(warmMs);
             }
-        }
+
+            // Add delay before countdown (like regular mode)
+            await delay(500);
+
+            // Countdown
+            setIsCountingDown(true);
+            for (let c = 3; c > 0; c--) {
+                setCount(c);
+                playSound('beep');
+                await delay(1000);
+            }
+            setIsCountingDown(false);
+
+            // Flash effect
+            if (isFlashEnabled) {
+                setIsFlashing(true);
+                setTimeout(() => setIsFlashing(false), 250);
+            }
+            playSound('shutter');
+
+            await delay(200);
+
+            // Capture snap frame
+            const liveResultPromise = livePhotoBuffer.captureWithBuffer();
+            let shot = webcamRef.current.getScreenshot();
+            let fullResShot = shot; // Keep original full resolution for storage
+
+            if (shot && isMirrored) {
+                try {
+                    shot = await unmirrorDataURL(shot);
+                    fullResShot = shot; // Unmirrored full res for storage
+                } catch (e) {
+                    console.warn('Failed to unmirror shot', e);
+                }
+            }
 
         // Crop to square for UI display
         let displayShot = shot;
@@ -379,7 +399,7 @@ const Booth = ({ hideUI = false }) => {
             }
         }
 
-        if (displayShot) {
+            if (displayShot) {
             // Fire-and-forget upload to Supabase for history tracking (full res)
             if (uploadsEnabled) {
                 uploadLivePhotoCapture({
@@ -408,23 +428,28 @@ const Booth = ({ hideUI = false }) => {
             // This prevents the old frame selection from persisting with the new photo
             setSelectedFrameIndex(targetIndex, 24);
 
-            // Upload the replaced photo (full resolution)
-            if (uploadsEnabled) {
-                setIsUploading(true);
-                try {
-                    const res = await fetch(fullResShot);
-                    const blob = await res.blob();
-                    await uploadPhoto(`${nickname}-strip-${targetIndex}-retake`, blob);
-                } catch (e) {
-                    console.error("Upload failed", e);
-                } finally {
-                    setIsUploading(false);
+                // Upload the replaced photo (full resolution)
+                if (uploadsEnabled) {
+                    setIsUploading(true);
+                    try {
+                        const res = await fetch(fullResShot);
+                        const blob = await res.blob();
+                        await uploadPhoto(`${nickname}-strip-${targetIndex}-retake`, blob);
+                    } catch (e) {
+                        console.error("Upload failed", e);
+                    } finally {
+                        setIsUploading(false);
+                    }
                 }
-            }
 
-            // Return to retake selection mode (user can select another photo or go back)
-            setRetakePhotoIndex(null);
-            setIsRetakeSelecting(true);
+                // Return to retake selection mode (user can select another photo or go back)
+                setRetakePhotoIndex(null);
+                setIsRetakeSelecting(true);
+            }
+        } finally {
+            setIsCountingDown(false);
+            setIsCaptureInProgress(false);
+            captureLockRef.current = false;
         }
     };
 
@@ -444,6 +469,9 @@ const Booth = ({ hideUI = false }) => {
 
 
     const handleStartCapture = handleStartStrip; // Alias for now
+
+    // Main controls should stay visible, but become non-interactive while capturing/processing.
+    const controlsDisabled = Boolean(hideUI || isCaptureInProgress || isUploading || isStripAnimating);
 
     // Utility: get center coords of webcam for initial flying image position
     // preferVideo: when true, use the video element's bounding rect (pixel-accurate canvas);
@@ -1048,12 +1076,13 @@ const Booth = ({ hideUI = false }) => {
 
                     {/* Mobile Controls - Clean symmetrical design */}
                     <div className="lg:hidden shrink-0 py-5 flex justify-center items-center bg-gradient-to-t from-black via-black/80 to-transparent">
-                        <div className={`flex items-center gap-5 transition-all duration-300 ${(isCountingDown || isUploading || isStripAnimating) ? 'opacity-0 pointer-events-none scale-95' : 'opacity-100 scale-100'}`}>
+                        <div className={`flex items-center gap-5 transition-all duration-300 ${controlsDisabled ? 'opacity-90 scale-100' : 'opacity-100 scale-100'}`}>
                             {/* Mirror Toggle - Left */}
                             <Motion.button
                                 whileTap={{ scale: 0.92 }}
                                 onClick={() => setIsMirrored(!isMirrored)}
-                                className="group"
+                                disabled={controlsDisabled}
+                                className="group disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 <div className={`w-12 h-12 rounded-xl flex items-center justify-center transition-all duration-300 backdrop-blur-md border ${isMirrored ? 'bg-cyan-500/90 border-cyan-400/50 shadow-lg shadow-cyan-500/40' : 'bg-white/10 border-white/20'}`}>
                                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className={`w-5 h-5 transition-colors duration-200 ${isMirrored ? 'text-white' : 'text-white/80'}`}>
@@ -1084,7 +1113,8 @@ const Booth = ({ hideUI = false }) => {
                                 <Motion.button
                                     whileTap={{ scale: 0.92 }}
                                     onClick={handleStartCapture}
-                                    className="relative w-16 h-16 rounded-full shadow-xl flex items-center justify-center overflow-hidden"
+                                    disabled={controlsDisabled}
+                                    className="relative w-16 h-16 rounded-full shadow-xl flex items-center justify-center overflow-hidden disabled:cursor-not-allowed"
                                     style={{
                                         background: 'linear-gradient(135deg, #ffffff 0%, #f0f0f0 50%, #e0e0e0 100%)',
                                         boxShadow: '0 6px 24px rgba(0,0,0,0.3), inset 0 2px 4px rgba(255,255,255,0.8)'
@@ -1092,7 +1122,7 @@ const Booth = ({ hideUI = false }) => {
                                 >
                                     {/* Pink inner button */}
                                     <div
-                                        className="w-12 h-12 rounded-full"
+                                        className={`w-12 h-12 rounded-full ${controlsDisabled ? 'opacity-60 saturate-0' : ''}`}
                                         style={{
                                             background: 'linear-gradient(145deg, #f87171 0%, #f4978e 40%, #e11d48 100%)',
                                             boxShadow: 'inset 0 -3px 10px rgba(0,0,0,0.2), inset 0 2px 4px rgba(255,255,255,0.3)'
@@ -1119,7 +1149,8 @@ const Booth = ({ hideUI = false }) => {
                             <Motion.button
                                 whileTap={{ scale: 0.92 }}
                                 onClick={() => setIsFlashEnabled(!isFlashEnabled)}
-                                className="group"
+                                disabled={controlsDisabled}
+                                className="group disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 <div className={`w-12 h-12 rounded-xl flex items-center justify-center transition-all duration-300 backdrop-blur-md border ${isFlashEnabled ? 'bg-amber-500/90 border-amber-400/50 shadow-lg shadow-amber-500/40' : 'bg-white/10 border-white/20'}`}>
                                     <svg xmlns="http://www.w3.org/2000/svg" fill={isFlashEnabled ? "currentColor" : "none"} viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className={`w-5 h-5 transition-all duration-200 ${isFlashEnabled ? 'text-white' : 'text-white/80'}`}>
@@ -1137,101 +1168,94 @@ const Booth = ({ hideUI = false }) => {
 
                     {/* Desktop Controls - Clean symmetrical design */}
                     <div className="hidden lg:flex absolute bottom-10 left-0 right-0 justify-center items-center z-10">
-                        <AnimatePresence>
-                            {!isCountingDown && !isUploading && !isStripAnimating && (
+                        <div className="flex items-center gap-6">
+                            {/* Mirror Toggle - Left */}
+                            <Motion.button
+                                whileHover={controlsDisabled ? undefined : { scale: 1.1, y: -2 }}
+                                whileTap={controlsDisabled ? undefined : { scale: 0.95 }}
+                                onClick={() => setIsMirrored(!isMirrored)}
+                                disabled={controlsDisabled}
+                                className="group disabled:opacity-50 disabled:cursor-not-allowed"
+                                title={isMirrored ? "Turn Mirroring Off" : "Turn Mirroring On"}
+                            >
+                                <div className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-all duration-300 backdrop-blur-md border ${isMirrored ? 'bg-cyan-500/90 border-cyan-400/50 shadow-lg shadow-cyan-500/50' : 'bg-white/10 border-white/20 hover:bg-white/20'}`}>
+                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className={`w-6 h-6 transition-all duration-200 ${isMirrored ? 'text-white' : 'text-white/80 group-hover:text-white'}`}>
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 21 3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5" />
+                                    </svg>
+                                </div>
+                            </Motion.button>
+
+                            {/* Shutter Button - Center Hero */}
+                            <div className="relative">
+                                {/* Soft glow background */}
+                                <div className="absolute -inset-3 rounded-full bg-pink-500/20 blur-xl" />
+
+                                {/* Subtle breathing animation ring */}
                                 <Motion.div
-                                    initial={{ opacity: 0, y: 20, scale: 0.95 }}
-                                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                                    exit={{ opacity: 0, y: 20, scale: 0.95 }}
-                                    transition={{ duration: 0.3, ease: "easeOut" }}
-                                    className="flex items-center gap-6"
+                                    animate={controlsDisabled ? { opacity: 0.25, scale: 1 } : {
+                                        scale: [1, 1.08, 1],
+                                        opacity: [0.6, 0.3, 0.6]
+                                    }}
+                                    transition={controlsDisabled ? { duration: 0.2 } : {
+                                        duration: 3,
+                                        repeat: Infinity,
+                                        ease: "easeInOut"
+                                    }}
+                                    className="absolute -inset-1 rounded-full border-2 border-pink-400/60"
+                                />
+
+                                <Motion.button
+                                    whileHover={controlsDisabled ? undefined : { scale: 1.05 }}
+                                    whileTap={controlsDisabled ? undefined : { scale: 0.92 }}
+                                    onClick={handleStartCapture}
+                                    disabled={controlsDisabled}
+                                    className="relative w-20 h-20 rounded-full shadow-2xl flex items-center justify-center overflow-hidden group disabled:cursor-not-allowed"
+                                    style={{
+                                        background: 'linear-gradient(135deg, #ffffff 0%, #f8f8f8 50%, #e8e8e8 100%)',
+                                        boxShadow: '0 8px 32px rgba(0,0,0,0.3), inset 0 2px 4px rgba(255,255,255,0.8)'
+                                    }}
                                 >
-                                    {/* Mirror Toggle - Left */}
-                                    <Motion.button
-                                        whileHover={{ scale: 1.1, y: -2 }}
-                                        whileTap={{ scale: 0.95 }}
-                                        onClick={() => setIsMirrored(!isMirrored)}
-                                        className="group"
-                                        title={isMirrored ? "Turn Mirroring Off" : "Turn Mirroring On"}
+                                    {/* Pink inner button */}
+                                    <div
+                                        className={`w-[64px] h-[64px] rounded-full flex items-center justify-center group-hover:brightness-110 transition-all duration-200 ${controlsDisabled ? 'opacity-60 saturate-0' : ''}`}
+                                        style={{
+                                            background: 'linear-gradient(145deg, #f87171 0%, #f4978e 40%, #e11d48 100%)',
+                                            boxShadow: 'inset 0 -4px 12px rgba(0,0,0,0.2), inset 0 2px 4px rgba(255,255,255,0.3)'
+                                        }}
+                                    />
+                                    {/* Top shine */}
+                                    <div className="absolute top-1.5 left-1/2 -translate-x-1/2 w-10 h-2 bg-white/60 rounded-full blur-[2px]" />
+                                </Motion.button>
+
+                                {/* Retake All indicator */}
+                                {isRetakeSelecting && (
+                                    <Motion.div
+                                        initial={{ opacity: 0, y: 10, scale: 0.9 }}
+                                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                                        className="absolute -top-12 left-1/2 -translate-x-1/2 whitespace-nowrap px-4 py-2 bg-gray-900/95 text-white text-xs font-bold rounded-full shadow-lg backdrop-blur-sm"
                                     >
-                                        <div className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-all duration-300 backdrop-blur-md border ${isMirrored ? 'bg-cyan-500/90 border-cyan-400/50 shadow-lg shadow-cyan-500/50' : 'bg-white/10 border-white/20 hover:bg-white/20'}`}>
-                                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className={`w-6 h-6 transition-all duration-200 ${isMirrored ? 'text-white' : 'text-white/80 group-hover:text-white'}`}>
-                                                <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 21 3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5" />
-                                            </svg>
-                                        </div>
-                                    </Motion.button>
+                                        Retake All
+                                        <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-gray-900 rotate-45" />
+                                    </Motion.div>
+                                )}
+                            </div>
 
-                                    {/* Shutter Button - Center Hero */}
-                                    <div className="relative">
-                                        {/* Soft glow background */}
-                                        <div className="absolute -inset-3 rounded-full bg-pink-500/20 blur-xl" />
-
-                                        {/* Subtle breathing animation ring */}
-                                        <Motion.div
-                                            animate={{
-                                                scale: [1, 1.08, 1],
-                                                opacity: [0.6, 0.3, 0.6]
-                                            }}
-                                            transition={{
-                                                duration: 3,
-                                                repeat: Infinity,
-                                                ease: "easeInOut"
-                                            }}
-                                            className="absolute -inset-1 rounded-full border-2 border-pink-400/60"
-                                        />
-
-                                        <Motion.button
-                                            whileHover={{ scale: 1.05 }}
-                                            whileTap={{ scale: 0.92 }}
-                                            onClick={handleStartCapture}
-                                            className="relative w-20 h-20 rounded-full shadow-2xl flex items-center justify-center overflow-hidden group"
-                                            style={{
-                                                background: 'linear-gradient(135deg, #ffffff 0%, #f8f8f8 50%, #e8e8e8 100%)',
-                                                boxShadow: '0 8px 32px rgba(0,0,0,0.3), inset 0 2px 4px rgba(255,255,255,0.8)'
-                                            }}
-                                        >
-                                            {/* Pink inner button */}
-                                            <div
-                                                className="w-[64px] h-[64px] rounded-full flex items-center justify-center group-hover:brightness-110 transition-all duration-200"
-                                                style={{
-                                                    background: 'linear-gradient(145deg, #f87171 0%, #f4978e 40%, #e11d48 100%)',
-                                                    boxShadow: 'inset 0 -4px 12px rgba(0,0,0,0.2), inset 0 2px 4px rgba(255,255,255,0.3)'
-                                                }}
-                                            />
-                                            {/* Top shine */}
-                                            <div className="absolute top-1.5 left-1/2 -translate-x-1/2 w-10 h-2 bg-white/60 rounded-full blur-[2px]" />
-                                        </Motion.button>
-
-                                        {/* Retake All indicator */}
-                                        {isRetakeSelecting && (
-                                            <Motion.div
-                                                initial={{ opacity: 0, y: 10, scale: 0.9 }}
-                                                animate={{ opacity: 1, y: 0, scale: 1 }}
-                                                className="absolute -top-12 left-1/2 -translate-x-1/2 whitespace-nowrap px-4 py-2 bg-gray-900/95 text-white text-xs font-bold rounded-full shadow-lg backdrop-blur-sm"
-                                            >
-                                                Retake All
-                                                <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-gray-900 rotate-45" />
-                                            </Motion.div>
-                                        )}
-                                    </div>
-
-                                    {/* Flash Toggle - Right */}
-                                    <Motion.button
-                                        whileHover={{ scale: 1.1, y: -2 }}
-                                        whileTap={{ scale: 0.95 }}
-                                        onClick={() => setIsFlashEnabled(!isFlashEnabled)}
-                                        className="group"
-                                        title={isFlashEnabled ? "Turn Flash Off" : "Turn Flash On"}
-                                    >
-                                        <div className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-all duration-300 backdrop-blur-md border ${isFlashEnabled ? 'bg-amber-500/90 border-amber-400/50 shadow-lg shadow-amber-500/50' : 'bg-white/10 border-white/20 hover:bg-white/20'}`}>
-                                            <svg xmlns="http://www.w3.org/2000/svg" fill={isFlashEnabled ? "currentColor" : "none"} viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className={`w-6 h-6 transition-all duration-200 ${isFlashEnabled ? 'text-white' : 'text-white/80 group-hover:text-white'}`}>
-                                                <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" />
-                                            </svg>
-                                        </div>
-                                    </Motion.button>
-                                </Motion.div>
-                            )}
-                        </AnimatePresence>
+                            {/* Flash Toggle - Right */}
+                            <Motion.button
+                                whileHover={controlsDisabled ? undefined : { scale: 1.1, y: -2 }}
+                                whileTap={controlsDisabled ? undefined : { scale: 0.95 }}
+                                onClick={() => setIsFlashEnabled(!isFlashEnabled)}
+                                disabled={controlsDisabled}
+                                className="group disabled:opacity-50 disabled:cursor-not-allowed"
+                                title={isFlashEnabled ? "Turn Flash Off" : "Turn Flash On"}
+                            >
+                                <div className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-all duration-300 backdrop-blur-md border ${isFlashEnabled ? 'bg-amber-500/90 border-amber-400/50 shadow-lg shadow-amber-500/50' : 'bg-white/10 border-white/20 hover:bg-white/20'}`}>
+                                    <svg xmlns="http://www.w3.org/2000/svg" fill={isFlashEnabled ? "currentColor" : "none"} viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className={`w-6 h-6 transition-all duration-200 ${isFlashEnabled ? 'text-white' : 'text-white/80 group-hover:text-white'}`}>
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" />
+                                    </svg>
+                                </div>
+                            </Motion.button>
+                        </div>
                     </div>
 
                     {/* Desktop Login info - bottom left */}
