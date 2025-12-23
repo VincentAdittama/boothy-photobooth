@@ -60,6 +60,16 @@ const URLImage = ({ src, isBackground = false, onSelect, onChange, onDragStart, 
             scaleX={props.scaleX || 1}
             x={props.x}
             draggable={!isBackground}
+            onMouseDown={(e) => {
+                if (!isBackground && onSelect) {
+                    onSelect(e);
+                }
+            }}
+            onTouchStart={(e) => {
+                if (!isBackground && onSelect) {
+                    onSelect(e);
+                }
+            }}
             onClick={onSelect}
             onTap={onSelect}
             onDragStart={() => {

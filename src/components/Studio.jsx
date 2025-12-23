@@ -445,6 +445,7 @@ const Studio = () => {
             height={layout.height}
             onMouseDown={checkDeselect}
             onTouchStart={checkDeselect}
+            style={{ touchAction: "none" }}
             ref={stageRef}
           >
             <Layer>
@@ -482,6 +483,9 @@ const Studio = () => {
                     livePhotoFrames[i] &&
                     livePhotoFrames[i].length > 0;
 
+                  const hasFrames =
+                    livePhotoFrames[i] && livePhotoFrames[i].length > 0;
+
                   return (
                     <React.Fragment key={i}>
                       <URLImage
@@ -494,6 +498,25 @@ const Studio = () => {
                         width={photoSize}
                         height={photoSize}
                       />
+
+                      {/* Live Photo tap/hover hit-target.
+                          Implemented inside the canvas to avoid DOM overlays intercepting mobile touches. */}
+                      {hasLivePhotos && !isEditing && hasFrames && (
+                        <Rect
+                          x={xPos}
+                          y={yPos}
+                          width={photoSize}
+                          height={photoSize}
+                          fill="black"
+                          opacity={0}
+                          onClick={() => handlePhotoClick(i)}
+                          onTap={() => handlePhotoClick(i)}
+                          onMouseEnter={() => setHoveredLivePhotoIndex(i)}
+                          onMouseLeave={() => setHoveredLivePhotoIndex(null)}
+                          onFocus={() => setHoveredLivePhotoIndex(i)}
+                          onBlur={() => setHoveredLivePhotoIndex(null)}
+                        />
+                      )}
 
                       {/* Hover overlay for Live Photo editing.
                           Drawn inside the canvas so it sits ABOVE the photo but BELOW stickers. */}
@@ -524,6 +547,7 @@ const Studio = () => {
                   isSelected={sticker.id === selectedId}
                   onSelect={() => selectShape(sticker.id)}
                   onDragStart={() => {
+                    selectShape(sticker.id);
                     setIsDraggingSticker(true);
                     draggingStickerId.current = sticker.id;
                   }}
@@ -599,55 +623,6 @@ const Studio = () => {
               />
             </Layer>
           </Stage>
-
-          {/* Clickable photo overlays for Live Photo editing (strip mode only) */}
-          {isStrip && hasLivePhotos && !isEditing && (
-            <div className="absolute inset-0 pointer-events-none">
-              {capturedImages.map((_, i) => {
-                const { photoSize, pad, border, gap } = layout;
-                const yPos = border + pad + i * (photoSize + gap);
-                const xPos = border + pad;
-                const hasFrames =
-                  livePhotoFrames[i] && livePhotoFrames[i].length > 0;
-
-                return hasFrames ? (
-                  <Motion.button
-                    key={`edit-${i}`}
-                    className={`absolute transition-all duration-200 cursor-pointer group ${
-                      isHoveringSticker || isDraggingSticker
-                        ? "pointer-events-none opacity-0"
-                        : "pointer-events-auto bg-transparent opacity-100"
-                    }`}
-                    style={{
-                      left: xPos,
-                      top: yPos,
-                      width: photoSize,
-                      height: photoSize,
-                    }}
-                    onClick={() => handlePhotoClick(i)}
-                    onMouseEnter={() => setHoveredLivePhotoIndex(i)}
-                    onMouseLeave={() => setHoveredLivePhotoIndex(null)}
-                    onFocus={() => setHoveredLivePhotoIndex(i)}
-                    onBlur={() => setHoveredLivePhotoIndex(null)}
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                  >
-                    {/* Live Photo indicator */}
-                    <div className="absolute top-2 left-2 px-2 py-1 bg-black/60 rounded-full text-white text-xs font-bold opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
-                      <span className="w-2 h-2 bg-yellow-400 rounded-full animate-pulse" />
-                      LIVE
-                    </div>
-                    {/* Edit hint */}
-                    <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                      <div className="px-4 py-2 bg-black/70 rounded-xl text-white font-bold">
-                        Choose Best Frame
-                      </div>
-                    </div>
-                  </Motion.button>
-                ) : null;
-              })}
-            </div>
-          )}
         </div>
       </Motion.div>
 
