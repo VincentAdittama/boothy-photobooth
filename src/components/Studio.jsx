@@ -413,12 +413,14 @@ const Studio = () => {
   // Handle clicking on a photo in the strip to edit its Live Photo
   const handlePhotoClick = (photoIndex) => {
     if (hasLivePhotos && livePhotoFrames[photoIndex]) {
+      setHoveredLivePhotoIndex(null);
       setCurrentlyEditingPhotoIndex(photoIndex);
     }
   };
 
   // Close the Live Photo editor
   const handleCloseEditor = () => {
+    setHoveredLivePhotoIndex(null);
     setCurrentlyEditingPhotoIndex(null);
   };
 
