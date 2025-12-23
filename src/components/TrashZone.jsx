@@ -1,9 +1,18 @@
 import React from 'react';
 import { motion as Motion, AnimatePresence } from 'framer-motion';
 
+const PARTICLE_OFFSETS = [
+    { x: -26, y: -18 },
+    { x: 22, y: -24 },
+    { x: -18, y: 20 },
+    { x: 28, y: 16 },
+    { x: 0, y: -30 },
+    { x: 0, y: 28 },
+];
+
 /**
  * TrashZone - Animated trash bin that appears when dragging stickers
- * 
+ *
  * Props:
  * - side: 'left' | 'right' - which side of the screen
  * - isVisible: boolean - controls entrance/exit animation
@@ -144,7 +153,7 @@ const TrashZone = ({ side, isVisible, isActive, zoneRef, isDesktop = false }) =>
                         {/* Particle effects when active */}
                         {isActive && (
                             <>
-                                {[...Array(6)].map((_, i) => (
+                                {PARTICLE_OFFSETS.map((p, i) => (
                                     <Motion.div
                                         key={i}
                                         className="absolute w-1.5 h-1.5 bg-red-300 rounded-full"
@@ -152,8 +161,8 @@ const TrashZone = ({ side, isVisible, isActive, zoneRef, isDesktop = false }) =>
                                         animate={{
                                             opacity: [0, 1, 0],
                                             scale: [0, 1, 0],
-                                            x: [0, (Math.random() - 0.5) * 60],
-                                            y: [0, (Math.random() - 0.5) * 60],
+                                            x: [0, p.x],
+                                            y: [0, p.y],
                                         }}
                                         transition={{
                                             duration: 0.8,

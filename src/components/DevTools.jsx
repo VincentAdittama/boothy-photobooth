@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import { useStore } from '../store';
 
 const PHASES = ['', 'LOGIN', 'STORY', 'BOOTH', 'STUDIO'];
@@ -17,8 +17,7 @@ const DevTools = () => {
     const setCapturedImages = useStore((s) => s.setCapturedImages);
     const setCapturedImage = useStore((s) => s.setCapturedImage);
     const resetSession = useStore((s) => s.resetSession);
-
-    const [nicknameDraft, setNicknameDraft] = useState('');
+    const nicknameInputRef = useRef(null);
 
     const isOpen = Boolean(devTools?.isOpen);
 
@@ -42,13 +41,9 @@ const DevTools = () => {
         return () => window.removeEventListener('keydown', onKeyDown);
     }, [toggleDevToolsOpen]);
 
-    useEffect(() => {
-        // Keep draft in sync when nickname changes elsewhere (e.g. Login)
-        setNicknameDraft(nickname || '');
-    }, [nickname]);
-
     const applyNickname = () => {
-        const next = String(nicknameDraft || '').trim().toUpperCase();
+        const raw = nicknameInputRef.current ? nicknameInputRef.current.value : '';
+        const next = String(raw || '').trim().toUpperCase();
         setNickname(next || 'GUEST');
     };
 
@@ -99,8 +94,9 @@ const DevTools = () => {
                             <div className="text-sm font-black">Nickname</div>
                             <div className="flex items-center gap-2">
                                 <input
-                                    value={nicknameDraft}
-                                    onChange={(e) => setNicknameDraft(e.target.value)}
+                                    key={nickname || 'GUEST'}
+                                    ref={nicknameInputRef}
+                                    defaultValue={nickname || ''}
                                     onKeyDown={(e) => {
                                         if (e.key === 'Enter') {
                                             e.preventDefault();

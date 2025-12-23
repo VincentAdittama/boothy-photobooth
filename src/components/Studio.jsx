@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import { Stage, Layer, Transformer, Rect, Text } from "react-konva";
 import { useStore } from "../store";
 import { motion as Motion, AnimatePresence } from "framer-motion";
@@ -64,7 +64,6 @@ const Studio = () => {
   const leftTrashRef = useRef(null);
   const rightTrashRef = useRef(null);
   const [activeTrashZone, setActiveTrashZone] = useState(null); // 'left' | 'right' | null
-  const [dragPosition, setDragPosition] = useState({ x: 0, y: 0 });
   const draggingStickerId = useRef(null);
 
   // Hit detection to manage z-index interaction between stickers (canvas) and DOM overlays
@@ -141,16 +140,15 @@ const Studio = () => {
 
   // Handle sticker drag move - check for trash zone hits (works on both mobile and desktop)
   const handleStickerDragMove = (stickerId, position) => {
-    setDragPosition({ x: position.viewportX, y: position.viewportY });
     const hitZone = checkTrashZoneHit(position.viewportX, position.viewportY);
     setActiveTrashZone(hitZone);
   };
 
   // Delete sticker by id
-  const deleteSticker = (id) => {
-    setStickers(stickers.filter((s) => s.id !== id));
+  const deleteSticker = useCallback((id) => {
+    setStickers((prev) => prev.filter((s) => s.id !== id));
     selectShape(null);
-  };
+  }, [setStickers]);
 
   // Recalculate layout on mount and resize
   useEffect(() => {
@@ -240,7 +238,7 @@ const Studio = () => {
     pushHistory(stickers);
   }, [stickers]);
 
-  const undo = () => {
+  const undo = useCallback(() => {
     const idx = historyRef.current.index;
     if (idx > 0) {
       isApplyingHistoryRef.current = true;
@@ -251,9 +249,9 @@ const Studio = () => {
       // Allow React to finish applying
       setTimeout(() => (isApplyingHistoryRef.current = false), 0);
     }
-  };
+  }, [setStickers]);
 
-  const redo = () => {
+  const redo = useCallback(() => {
     const idx = historyRef.current.index;
     if (idx < historyRef.current.stack.length - 1) {
       isApplyingHistoryRef.current = true;
@@ -263,7 +261,7 @@ const Studio = () => {
       setStickers(next);
       setTimeout(() => (isApplyingHistoryRef.current = false), 0);
     }
-  };
+  }, [setStickers]);
 
   // Keyboard handlers for undo/redo (Cmd/Ctrl+Z, Shift+Cmd/Ctrl+Z or Cmd/Ctrl+Y) and Delete
   useEffect(() => {
@@ -299,7 +297,7 @@ const Studio = () => {
 
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
-  }, [selectedId]);
+  }, [selectedId, deleteSticker, undo, redo]);
 
   const checkDeselect = (e) => {
     const target = e.target;
