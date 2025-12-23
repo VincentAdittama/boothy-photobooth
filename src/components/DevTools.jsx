@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useStore } from '../store';
 
 const PHASES = ['', 'LOGIN', 'STORY', 'BOOTH', 'STUDIO'];
@@ -11,11 +11,14 @@ const DevTools = () => {
 
     const currentPhase = useStore((s) => s.currentPhase);
     const nickname = useStore((s) => s.nickname);
+    const setNickname = useStore((s) => s.setNickname);
 
     const setPhase = useStore((s) => s.setPhase);
     const setCapturedImages = useStore((s) => s.setCapturedImages);
     const setCapturedImage = useStore((s) => s.setCapturedImage);
     const resetSession = useStore((s) => s.resetSession);
+
+    const [nicknameDraft, setNicknameDraft] = useState('');
 
     const isOpen = Boolean(devTools?.isOpen);
 
@@ -38,6 +41,16 @@ const DevTools = () => {
         window.addEventListener('keydown', onKeyDown);
         return () => window.removeEventListener('keydown', onKeyDown);
     }, [toggleDevToolsOpen]);
+
+    useEffect(() => {
+        // Keep draft in sync when nickname changes elsewhere (e.g. Login)
+        setNicknameDraft(nickname || '');
+    }, [nickname]);
+
+    const applyNickname = () => {
+        const next = String(nicknameDraft || '').trim().toUpperCase();
+        setNickname(next || 'GUEST');
+    };
 
     const seedMockStrip = () => {
         setCapturedImages([MOCK_IMG, MOCK_IMG, MOCK_IMG]);
@@ -82,6 +95,31 @@ const DevTools = () => {
                     </div>
 
                     <div className="px-4 pb-4 space-y-3">
+                        <div className="space-y-2">
+                            <div className="text-sm font-black">Nickname</div>
+                            <div className="flex items-center gap-2">
+                                <input
+                                    value={nicknameDraft}
+                                    onChange={(e) => setNicknameDraft(e.target.value)}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter') {
+                                            e.preventDefault();
+                                            applyNickname();
+                                        }
+                                    }}
+                                    className="flex-1 bg-white border-2 border-black rounded-full px-3 py-2 text-sm font-black"
+                                    placeholder="e.g. VINCENT"
+                                />
+                                <button
+                                    type="button"
+                                    className="px-3 py-2 rounded-2xl bg-black text-white text-sm font-black"
+                                    onClick={applyNickname}
+                                >
+                                    Apply
+                                </button>
+                            </div>
+                        </div>
+
                         <label className="flex items-center justify-between gap-3 text-sm font-black">
                             <span>Upload to Supabase</span>
                             <input
