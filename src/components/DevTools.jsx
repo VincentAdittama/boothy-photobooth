@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo, useRef } from 'react';
 import { useStore } from '../store';
+import { getMockStripSeed } from '../utils/mockLivePhoto';
 
 const PHASES = ['', 'LOGIN', 'STORY', 'BOOTH', 'STUDIO'];
-const MOCK_IMG = '/assets/hello.webp';
 
 const DevTools = () => {
     const devTools = useStore((s) => s.devTools);
@@ -16,6 +16,9 @@ const DevTools = () => {
     const setPhase = useStore((s) => s.setPhase);
     const setCapturedImages = useStore((s) => s.setCapturedImages);
     const setCapturedImage = useStore((s) => s.setCapturedImage);
+    const setCapturedImageIsMirrored = useStore((s) => s.setCapturedImageIsMirrored);
+    const setLivePhotoFrames = useStore((s) => s.setLivePhotoFrames);
+    const resetLivePhotoState = useStore((s) => s.resetLivePhotoState);
     const resetSession = useStore((s) => s.resetSession);
     const nicknameInputRef = useRef(null);
 
@@ -48,8 +51,12 @@ const DevTools = () => {
     };
 
     const seedMockStrip = () => {
-        setCapturedImages([MOCK_IMG, MOCK_IMG, MOCK_IMG]);
-        setCapturedImage(MOCK_IMG);
+        const seed = getMockStripSeed();
+        resetLivePhotoState();
+        setCapturedImages(seed.images);
+        setCapturedImage(seed.capturedImage);
+        setCapturedImageIsMirrored(seed.capturedImageIsMirrored);
+        setLivePhotoFrames(seed.livePhotoFrames);
     };
 
     const goToPhase = (phase) => {

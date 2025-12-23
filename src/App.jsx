@@ -7,8 +7,7 @@ import StoryReader from './components/StoryReader';
 import CurtainTransition from './components/CurtainTransition';
 import Studio from './components/Studio';
 import DevTools from './components/DevTools';
-
-const MOCK_IMG = '/assets/hello.webp';
+import { getMockStripSeed } from './utils/mockLivePhoto';
 
 function App() {
   const currentPhase = useStore((state) => state.currentPhase);
@@ -19,6 +18,9 @@ function App() {
   const setPhase = useStore((state) => state.setPhase);
   const setCapturedImages = useStore((state) => state.setCapturedImages);
   const setCapturedImage = useStore((state) => state.setCapturedImage);
+  const setLivePhotoFrames = useStore((state) => state.setLivePhotoFrames);
+  const resetLivePhotoState = useStore((state) => state.resetLivePhotoState);
+  const setCapturedImageIsMirrored = useStore((state) => state.setCapturedImageIsMirrored);
 
   const didApplyDevDefault = useRef(false);
 
@@ -30,11 +32,23 @@ function App() {
 
     didApplyDevDefault.current = true;
     if (phase === 'STUDIO') {
-      setCapturedImages([MOCK_IMG, MOCK_IMG, MOCK_IMG]);
-      setCapturedImage(MOCK_IMG);
+      const seed = getMockStripSeed();
+      resetLivePhotoState();
+      setCapturedImages(seed.images);
+      setCapturedImage(seed.capturedImage);
+      setCapturedImageIsMirrored(seed.capturedImageIsMirrored);
+      setLivePhotoFrames(seed.livePhotoFrames);
     }
     setPhase(phase);
-  }, [devTools?.defaultPhaseOnLoad, setCapturedImages, setCapturedImage, setPhase]);
+  }, [
+    devTools?.defaultPhaseOnLoad,
+    resetLivePhotoState,
+    setCapturedImages,
+    setCapturedImage,
+    setCapturedImageIsMirrored,
+    setLivePhotoFrames,
+    setPhase,
+  ]);
 
   return (
     <div className="antialiased h-screen w-screen overflow-hidden relative">
