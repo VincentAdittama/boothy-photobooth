@@ -208,10 +208,12 @@ const Studio = () => {
     ) {
       const node = stickersRefs.current[selectedId];
       transformerRef.current.nodes([node]);
-      transformerRef.current.getLayer().batchDraw();
+      const layer = transformerRef.current.getLayer && transformerRef.current.getLayer();
+      if (layer) layer.batchDraw();
     } else if (transformerRef.current) {
       transformerRef.current.nodes([]);
-      transformerRef.current.getLayer().batchDraw();
+      const layer = transformerRef.current.getLayer && transformerRef.current.getLayer();
+      if (layer) layer.batchDraw();
     }
   }, [selectedId, stickers]); // Re-run if stickers change (e.g. re-order or delete)
 

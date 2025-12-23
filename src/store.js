@@ -104,7 +104,9 @@ export const useStore = create((set) => ({
     })),
     setCurrentlyEditingPhotoIndex: (index) => set({ currentlyEditingPhotoIndex: index }),
     // Studio stickers actions
-    setStickers: (stickers) => set({ stickers }),
+    setStickers: (next) => set((state) => ({
+        stickers: typeof next === 'function' ? next(state.stickers) : next,
+    })),
 
     setDevTools: (patch) => set((state) => {
         const next = { ...(state.devTools || initialDevTools), ...(patch || {}) };

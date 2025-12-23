@@ -2,6 +2,21 @@ import React from 'react';
 import { Image as KonvaImage } from 'react-konva';
 import useImage from 'use-image';
 
+const getViewportPointFromEvent = (evt) => {
+    if (!evt) return null;
+
+    if (typeof evt.clientX === 'number' && typeof evt.clientY === 'number') {
+        return { x: evt.clientX, y: evt.clientY };
+    }
+
+    const touch = (evt.touches && evt.touches[0]) || (evt.changedTouches && evt.changedTouches[0]);
+    if (touch && typeof touch.clientX === 'number' && typeof touch.clientY === 'number') {
+        return { x: touch.clientX, y: touch.clientY };
+    }
+
+    return null;
+};
+
 // URLImage component for loading images on canvas
 const URLImage = ({ src, isBackground = false, onSelect, onChange, onDragStart, onDragMove, onDragEnd, shapeRef, ...props }) => {
     const [image] = useImage(src, 'anonymous');
@@ -54,17 +69,35 @@ const URLImage = ({ src, isBackground = false, onSelect, onChange, onDragStart, 
             }}
             onDragMove={(e) => {
                 if (!isBackground && onDragMove) {
-                    // Get viewport position for hit detection outside canvas
-                    const stage = e.target.getStage();
-                    const pointerPos = stage.getPointerPosition();
-                    const container = stage.container();
+                    // Get viewport position for hit detection outside canvas.
+                    // On mobile Safari, Konva can momentarily report a null pointer position while dragging,
+                    // which would otherwise crash the app.
+                    const viewportPoint = getViewportPointFromEvent(e?.evt);
+
+                    const stage = e?.target?.getStage?.();
+                    const pointerPos = stage?.getPointerPosition?.() || null;
+
+                    if (viewportPoint) {
+                        onDragMove({
+                            viewportX: viewportPoint.x,
+                            viewportY: viewportPoint.y,
+                            stageX: pointerPos ? pointerPos.x : undefined,
+                            stageY: pointerPos ? pointerPos.y : undefined,
+                        });
+                        return;
+                    }
+
+                    if (!stage || !pointerPos) return;
+                    const container = stage.container && stage.container();
+                    if (!container || !container.getBoundingClientRect) return;
                     const rect = container.getBoundingClientRect();
 
-                    // Convert to viewport coordinates
-                    const viewportX = rect.left + pointerPos.x;
-                    const viewportY = rect.top + pointerPos.y;
-
-                    onDragMove({ viewportX, viewportY, stageX: pointerPos.x, stageY: pointerPos.y });
+                    onDragMove({
+                        viewportX: rect.left + pointerPos.x,
+                        viewportY: rect.top + pointerPos.y,
+                        stageX: pointerPos.x,
+                        stageY: pointerPos.y,
+                    });
                 }
             }}
             onDragEnd={(e) => {
