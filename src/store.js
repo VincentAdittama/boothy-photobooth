@@ -1,5 +1,38 @@
 import { create } from 'zustand';
 
+const DEVTOOLS_STORAGE_KEY = 'boothy.devtools';
+
+const readDevToolsFromStorage = () => {
+    if (typeof window === 'undefined') return {};
+    try {
+        const raw = window.localStorage.getItem(DEVTOOLS_STORAGE_KEY);
+        if (!raw) return {};
+        const parsed = JSON.parse(raw);
+        return parsed && typeof parsed === 'object' ? parsed : {};
+    } catch {
+        return {};
+    }
+};
+
+const writeDevToolsToStorage = (devTools) => {
+    if (typeof window === 'undefined') return;
+    try {
+        window.localStorage.setItem(DEVTOOLS_STORAGE_KEY, JSON.stringify(devTools));
+    } catch {
+        // ignore
+    }
+};
+
+const initialDevTools = (() => {
+    const stored = readDevToolsFromStorage();
+    return {
+        isOpen: false,
+        uploadsEnabled: stored.uploadsEnabled !== undefined ? Boolean(stored.uploadsEnabled) : true,
+        skipStoryAfterLogin: Boolean(stored.skipStoryAfterLogin),
+        defaultPhaseOnLoad: typeof stored.defaultPhaseOnLoad === 'string' ? stored.defaultPhaseOnLoad : '',
+    };
+})();
+
 export const useStore = create((set) => ({
     currentPhase: 'LOGIN', // 'LOGIN' | 'STORY' | 'BOOTH' | 'STUDIO'
     userType: 'DEFAULT', // 'DEFAULT' | 'VIP'
@@ -29,6 +62,9 @@ export const useStore = create((set) => ({
 
     // Studio stickers state - persists across retakes within same session
     stickers: [],
+
+    // Dev-only helpers (persisted to localStorage)
+    devTools: initialDevTools,
 
     setPhase: (phase) => set({ currentPhase: phase }),
     setUserType: (type) => set({ userType: type }),
@@ -69,6 +105,40 @@ export const useStore = create((set) => ({
     setCurrentlyEditingPhotoIndex: (index) => set({ currentlyEditingPhotoIndex: index }),
     // Studio stickers actions
     setStickers: (stickers) => set({ stickers }),
+
+    setDevTools: (patch) => set((state) => {
+        const next = { ...(state.devTools || initialDevTools), ...(patch || {}) };
+        writeDevToolsToStorage({
+            uploadsEnabled: next.uploadsEnabled,
+            skipStoryAfterLogin: next.skipStoryAfterLogin,
+            defaultPhaseOnLoad: next.defaultPhaseOnLoad,
+        });
+        return { devTools: next };
+    }),
+    toggleDevToolsOpen: () => set((state) => ({ devTools: { ...(state.devTools || initialDevTools), isOpen: !(state.devTools && state.devTools.isOpen) } })),
+
+    resetSession: () => set((state) => ({
+        currentPhase: 'LOGIN',
+        userType: 'DEFAULT',
+        nickname: 'GUEST',
+        capturedImage: null,
+        capturedImages: [],
+        capturedImageIsMirrored: false,
+        isFlashing: false,
+        isCameraPreloading: false,
+        originalCapturedImageIsMirrored: false,
+        originalCapturedImageIsMirroredArray: [],
+        isCurtainOpen: true,
+        isTransitioning: false,
+        isRetakeSelecting: false,
+        retakePhotoIndex: null,
+        livePhotoFrames: [],
+        selectedFrameIndices: [24, 24, 24],
+        currentlyEditingPhotoIndex: null,
+        stickers: [],
+        // preserve devTools
+        devTools: state.devTools || initialDevTools,
+    })),
     // Update a specific captured image (used when confirming frame selection)
     updateCapturedImage: (photoIndex, newImageSrc) => set((state) => ({
         capturedImages: state.capturedImages.map((img, i) =>

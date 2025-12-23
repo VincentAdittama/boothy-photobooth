@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { motion as Motion, AnimatePresence } from 'framer-motion';
 import { useStore } from './store';
 import Login from './components/Login';
@@ -6,16 +6,40 @@ import Booth from './components/Booth';
 import StoryReader from './components/StoryReader';
 import CurtainTransition from './components/CurtainTransition';
 import Studio from './components/Studio';
+import DevTools from './components/DevTools';
+
+const MOCK_IMG = '/assets/hello.webp';
 
 function App() {
   const currentPhase = useStore((state) => state.currentPhase);
   const isFlashing = useStore((state) => state.isFlashing);
   const isCameraPreloading = useStore((state) => state.isCameraPreloading);
   const isTransitioning = useStore((state) => state.isTransitioning);
+  const devTools = useStore((state) => state.devTools);
+  const setPhase = useStore((state) => state.setPhase);
+  const setCapturedImages = useStore((state) => state.setCapturedImages);
+  const setCapturedImage = useStore((state) => state.setCapturedImage);
+
+  const didApplyDevDefault = useRef(false);
+
+  useEffect(() => {
+    if (!import.meta.env.DEV) return;
+    if (didApplyDevDefault.current) return;
+    const phase = devTools?.defaultPhaseOnLoad;
+    if (!phase) return;
+
+    didApplyDevDefault.current = true;
+    if (phase === 'STUDIO') {
+      setCapturedImages([MOCK_IMG, MOCK_IMG, MOCK_IMG]);
+      setCapturedImage(MOCK_IMG);
+    }
+    setPhase(phase);
+  }, [devTools?.defaultPhaseOnLoad, setCapturedImages, setCapturedImage, setPhase]);
 
   return (
     <div className="antialiased h-screen w-screen overflow-hidden relative">
       <CurtainTransition />
+      {import.meta.env.DEV && <DevTools />}
       {currentPhase === 'LOGIN' && <Login />}
       {currentPhase === 'STORY' && <StoryReader />}
 

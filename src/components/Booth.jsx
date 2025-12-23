@@ -16,8 +16,11 @@ const Booth = ({ hideUI = false }) => {
         setLivePhotoFrames, resetLivePhotoState,
         // Retake selection state
         isRetakeSelecting, setRetakePhotoIndex, clearRetakeState, setIsRetakeSelecting,
-        updateCapturedImage, livePhotoFrames, setSelectedFrameIndex
+        updateCapturedImage, livePhotoFrames, setSelectedFrameIndex,
+        devTools
     } = useStore();
+
+    const uploadsEnabled = devTools?.uploadsEnabled !== false;
 
     // Live Photo buffer hook - captures frames before and after each snap
     const bufferOptions = React.useMemo(() => ({
@@ -206,13 +209,15 @@ const Booth = ({ hideUI = false }) => {
                 appendOriginalCapturedImageIsMirrored(Boolean(isMirrored));
 
                 // Fire-and-forget upload to Supabase for history tracking (full res)
-                uploadLivePhotoCapture({
-                    nickname,
-                    photoData: fullResShot,
-                    sessionId,
-                    photoIndex: shots.length - 1,
-                    captureType: 'snap'
-                });
+                if (uploadsEnabled) {
+                    uploadLivePhotoCapture({
+                        nickname,
+                        photoData: fullResShot,
+                        sessionId,
+                        photoIndex: shots.length - 1,
+                        captureType: 'snap'
+                    });
+                }
 
                 // trigger fly animation for this shot to its hole IMMEDIATELY (use cropped version)
                 // Don't wait for live photo buffer to complete
@@ -252,19 +257,23 @@ const Booth = ({ hideUI = false }) => {
             // setCapturedImageIsMirrored(isMirrored); // Already set at start
             setOriginalCapturedImageIsMirrored(Boolean(isMirrored)); // Track feed mirroring state
 
-            setIsUploading(true);
+            if (uploadsEnabled) {
+                setIsUploading(true);
+                try {
+                    // Upload all sequentially (full resolution images)
+                    for (const [index, src] of fullResShots.entries()) {
+                        const res = await fetch(src);
+                        const blob = await res.blob();
+                        await uploadPhoto(`${nickname}-strip-${index}`, blob);
+                    }
+                } catch (e) {
+                    console.error("Upload failed", e);
+                } finally {
+                    setIsUploading(false);
+                }
+            }
 
             try {
-                // Upload all sequentially (full resolution images)
-                for (const [index, src] of fullResShots.entries()) {
-                    const res = await fetch(src);
-                    const blob = await res.blob();
-                    await uploadPhoto(`${nickname}-strip-${index}`, blob);
-                }
-            } catch (e) {
-                console.error("Upload failed", e);
-            } finally {
-                setIsUploading(false);
                 // play final strip animation
                 // User Request: Seamless transition
 
@@ -299,6 +308,9 @@ const Booth = ({ hideUI = false }) => {
 
                 // Clear transition flag after curtain opens
                 await delay(100);
+                setIsTransitioning(false);
+            } catch (e) {
+                console.error('Transition failed', e);
                 setIsTransitioning(false);
             }
         }
@@ -369,13 +381,15 @@ const Booth = ({ hideUI = false }) => {
 
         if (displayShot) {
             // Fire-and-forget upload to Supabase for history tracking (full res)
-            uploadLivePhotoCapture({
-                nickname,
-                photoData: fullResShot,
-                sessionId: retakeSessionId,
-                photoIndex: targetIndex,
-                captureType: 'retake'
-            });
+            if (uploadsEnabled) {
+                uploadLivePhotoCapture({
+                    nickname,
+                    photoData: fullResShot,
+                    sessionId: retakeSessionId,
+                    photoIndex: targetIndex,
+                    captureType: 'retake'
+                });
+            }
 
             // Trigger fly animation to the target cuthole (use cropped version)
             // For single retake captures, originate from the actual video canvas for pixel-accurate feel
@@ -395,20 +409,22 @@ const Booth = ({ hideUI = false }) => {
             setSelectedFrameIndex(targetIndex, 24);
 
             // Upload the replaced photo (full resolution)
-            setIsUploading(true);
-            try {
-                const res = await fetch(fullResShot);
-                const blob = await res.blob();
-                await uploadPhoto(`${nickname}-strip-${targetIndex}-retake`, blob);
-            } catch (e) {
-                console.error("Upload failed", e);
-            } finally {
-                setIsUploading(false);
-
-                // Return to retake selection mode (user can select another photo or go back)
-                setRetakePhotoIndex(null);
-                setIsRetakeSelecting(true);
+            if (uploadsEnabled) {
+                setIsUploading(true);
+                try {
+                    const res = await fetch(fullResShot);
+                    const blob = await res.blob();
+                    await uploadPhoto(`${nickname}-strip-${targetIndex}-retake`, blob);
+                } catch (e) {
+                    console.error("Upload failed", e);
+                } finally {
+                    setIsUploading(false);
+                }
             }
+
+            // Return to retake selection mode (user can select another photo or go back)
+            setRetakePhotoIndex(null);
+            setIsRetakeSelecting(true);
         }
     };
 

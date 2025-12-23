@@ -28,6 +28,20 @@ if (supabaseUrl && supabaseAnonKey) {
 
 export const supabase = supabaseInstance;
 
+const devUploadsEnabled = () => {
+    // DevTools toggle is persisted by the app store. In non-browser contexts, default to enabled.
+    if (typeof window === 'undefined') return true;
+    try {
+        const raw = window.localStorage.getItem('boothy.devtools');
+        if (!raw) return true;
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed === 'object' && parsed.uploadsEnabled === false) return false;
+        return true;
+    } catch {
+        return true;
+    }
+};
+
 /**
  * Uploads a photo blob to Supabase Storage and records it in the database.
  * @param {string} nickname - The user's nickname
@@ -35,6 +49,10 @@ export const supabase = supabaseInstance;
  * @returns {Promise<string>} - The public URL of the uploaded image
  */
 export const uploadPhoto = async (nickname, photoBlob) => {
+    if (!devUploadsEnabled()) {
+        console.info('[Supabase] Uploads disabled via DevTools; skipping uploadPhoto');
+        return null;
+    }
     if (!supabase) {
         console.error("Supabase not initialized. Check .env");
         throw new Error("Supabase not configured");
@@ -125,6 +143,9 @@ export const uploadLivePhotoCapture = async ({
     photoIndex,
     captureType = 'snap'
 }) => {
+    if (!devUploadsEnabled()) {
+        return null;
+    }
     // Fire-and-forget: don't throw errors, just log them
     if (!supabase) {
         console.warn('[LivePhoto] Supabase not configured, skipping upload');
