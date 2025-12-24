@@ -19,39 +19,24 @@ const PARTICLE_OFFSETS = [
  * - isActive: boolean - highlight when sticker hovers over
  * - zoneRef: ref - for hit detection bounds
  * - isDesktop: boolean - if true, positions closer to center (near photostrip)
+ * - followPoint: { x: number, y: number } | null - viewport coords to follow
+ * - followEnabled: boolean - only the closest bin should track the point
  */
-const TrashZone = ({ side, isVisible, isActive, zoneRef, isDesktop = false }) => {
+const TrashZone = ({
+    side,
+    isVisible,
+    isActive,
+    zoneRef,
+    isDesktop = false,
+    followPoint = null,
+    followEnabled = false,
+}) => {
     const isLeft = side === 'left';
 
-    // Animation variants
-    const containerVariants = {
-        hidden: {
-            x: isLeft ? -100 : 100,
-            opacity: 0,
-            scale: 0.5,
-        },
-        visible: {
-            x: 0,
-            opacity: 1,
-            scale: 1,
-            transition: {
-                type: 'spring',
-                stiffness: 400,
-                damping: 25,
-                mass: 0.8,
-            }
-        },
-        exit: {
-            x: isLeft ? -100 : 100,
-            opacity: 0,
-            scale: 0.5,
-            transition: {
-                type: 'spring',
-                stiffness: 400,
-                damping: 30,
-            }
-        }
-    };
+    // On desktop, the canvas is centered in the space remaining after the 320px sidebar
+    // So the visual center is shifted left by 160px
+    const sidebarShift = 160;
+    const distanceFromCenter = 340; // How far from the visual center we want the bins
 
     // Floating animation for idle state
     const floatVariants = {
@@ -66,20 +51,39 @@ const TrashZone = ({ side, isVisible, isActive, zoneRef, isDesktop = false }) =>
         }
     };
 
+    const defaultTop = typeof window !== 'undefined' ? window.innerHeight / 2 : 0;
+    const followTop = typeof followPoint?.y === 'number' ? followPoint.y : defaultTop;
+    const targetTop = followEnabled ? followTop : defaultTop;
+    
+    // Calculate target X position accounting for the sidebar shift on desktop
+    const targetX = isDesktop 
+        ? (isLeft ? -(distanceFromCenter + sidebarShift) : (distanceFromCenter - sidebarShift)) 
+        : 0;
+
     return (
         <AnimatePresence>
             {isVisible && (
                 <Motion.div
                     ref={zoneRef}
-                    className={`fixed top-1/2 -translate-y-1/2 z-100 pointer-events-none
+                    className={`fixed -translate-y-1/2 z-300 pointer-events-none
                         ${isDesktop
-                            ? (isLeft ? 'left-[calc(50%-180px)]' : 'right-[calc(50%-180px)]')
+                            ? 'left-1/2 -translate-x-1/2'
                             : (isLeft ? 'left-2' : 'right-2')
                         }`}
-                    variants={containerVariants}
-                    initial="hidden"
-                    animate="visible"
-                    exit="exit"
+                    initial={{ opacity: 0, scale: 0.5, top: targetTop, x: targetX }}
+                    animate={{
+                        opacity: 1,
+                        scale: 1,
+                        top: targetTop,
+                        x: targetX,
+                    }}
+                    exit={{ opacity: 0, scale: 0.5 }}
+                    transition={{
+                        type: 'spring',
+                        stiffness: 400,
+                        damping: 30,
+                        mass: 0.8,
+                    }}
                 >
                     <Motion.div
                         variants={floatVariants}

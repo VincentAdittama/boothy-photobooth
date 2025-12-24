@@ -7,6 +7,7 @@ import { getStickers } from "../data/stickers";
 import { calculateStripLayout } from "../utils/stripLayout";
 import LivePhotoEditor from "./LivePhotoEditor";
 import TrashZone from "./TrashZone";
+import { polygonIntersectsRect } from "../utils/polygonRect";
 
 const Studio = () => {
   const {
@@ -66,6 +67,12 @@ const Studio = () => {
   const rightTrashRef = useRef(null);
   const [activeTrashZone, setActiveTrashZone] = useState(null); // 'left' | 'right' | null
   const draggingStickerId = useRef(null);
+  const [dragDeleteState, setDragDeleteState] = useState({
+    stickerId: null,
+    isOutside: false,
+    side: null,
+    followPoint: null, // viewport coords
+  });
 
   // Hit detection to manage z-index interaction between stickers (canvas) and DOM overlays
   useEffect(() => {
@@ -107,43 +114,77 @@ const Studio = () => {
     return () => window.removeEventListener("resize", checkMobile);
   }, []);
 
-  // Check if drag position is over trash zones (works on both mobile and desktop)
-  const checkTrashZoneHit = (viewportX, viewportY) => {
-    const leftZone = leftTrashRef.current;
-    const rightZone = rightTrashRef.current;
+  const getStickerPolygonInStage = useCallback((stickerId) => {
+    const node = stickersRefs.current[stickerId];
+    if (!node) return null;
 
-    if (leftZone) {
-      const rect = leftZone.getBoundingClientRect();
-      if (
-        viewportX >= rect.left &&
-        viewportX <= rect.right &&
-        viewportY >= rect.top &&
-        viewportY <= rect.bottom
-      ) {
-        return "left";
+    const transform = node.getAbsoluteTransform().copy();
+    const w = node.width();
+    const h = node.height();
+
+    return [
+      transform.point({ x: 0, y: 0 }),
+      transform.point({ x: w, y: 0 }),
+      transform.point({ x: w, y: h }),
+      transform.point({ x: 0, y: h }),
+    ];
+  }, []);
+
+  const getStickerCenterInStage = useCallback((stickerId) => {
+    const node = stickersRefs.current[stickerId];
+    if (!node) return null;
+    const transform = node.getAbsoluteTransform().copy();
+    return transform.point({ x: node.width() / 2, y: node.height() / 2 });
+  }, []);
+
+  const handleStickerDragMove = useCallback(
+    (stickerId, position) => {
+      if (!stageRef.current) return;
+      const stage = stageRef.current;
+
+      const stripRect = { x: 0, y: 0, width: layout.width, height: layout.height };
+
+      const polygon = getStickerPolygonInStage(stickerId);
+      if (!polygon) return;
+
+      const intersects = polygonIntersectsRect(polygon, stripRect);
+      const isOutside = !intersects;
+
+      if (!isOutside) {
+        setActiveTrashZone(null);
+        setDragDeleteState((prev) => {
+          if (prev.stickerId !== stickerId && prev.stickerId !== null) return prev;
+          return { stickerId, isOutside: false, side: null, followPoint: null };
+        });
+        return;
       }
-    }
 
-    if (rightZone) {
-      const rect = rightZone.getBoundingClientRect();
-      if (
-        viewportX >= rect.left &&
-        viewportX <= rect.right &&
-        viewportY >= rect.top &&
-        viewportY <= rect.bottom
-      ) {
-        return "right";
+      const center = getStickerCenterInStage(stickerId);
+      const side = center && center.x < stripRect.width / 2 ? "left" : "right";
+      setActiveTrashZone(side);
+
+      let followPoint = null;
+      try {
+        const container = stage.container();
+        const rect = container.getBoundingClientRect();
+        const centerViewport = center
+          ? { x: rect.left + center.x, y: rect.top + center.y }
+          : { x: position.viewportX, y: position.viewportY };
+
+        const clampPad = 70;
+        const clampedY = Math.max(
+          clampPad,
+          Math.min(window.innerHeight - clampPad, centerViewport.y)
+        );
+        followPoint = { x: centerViewport.x, y: clampedY };
+      } catch {
+        followPoint = { x: position.viewportX, y: position.viewportY };
       }
-    }
 
-    return null;
-  };
-
-  // Handle sticker drag move - check for trash zone hits (works on both mobile and desktop)
-  const handleStickerDragMove = (stickerId, position) => {
-    const hitZone = checkTrashZoneHit(position.viewportX, position.viewportY);
-    setActiveTrashZone(hitZone);
-  };
+      setDragDeleteState({ stickerId, isOutside: true, side, followPoint });
+    },
+    [getStickerPolygonInStage, getStickerCenterInStage, layout.width, layout.height]
+  );
 
   // Delete sticker by id
   const deleteSticker = useCallback((id) => {
@@ -550,6 +591,12 @@ const Studio = () => {
                     selectShape(sticker.id);
                     setIsDraggingSticker(true);
                     draggingStickerId.current = sticker.id;
+                    setDragDeleteState({
+                      stickerId: sticker.id,
+                      isOutside: false,
+                      side: null,
+                      followPoint: null,
+                    });
                   }}
                   onDragMove={(position) => {
                     handleStickerDragMove(sticker.id, position);
@@ -557,11 +604,12 @@ const Studio = () => {
                   onDragEnd={(newAttrs) => {
                     setIsDraggingSticker(false);
 
-                    // Check if dropped on trash zone (works on both mobile and desktop)
-                    if (activeTrashZone) {
+                    // Delete when sticker is absolutely outside photostrip
+                    if (dragDeleteState.stickerId === sticker.id && dragDeleteState.isOutside) {
                       deleteSticker(sticker.id);
                       setActiveTrashZone(null);
                       draggingStickerId.current = null;
+                      setDragDeleteState({ stickerId: null, isOutside: false, side: null, followPoint: null });
                       return;
                     }
 
@@ -571,6 +619,7 @@ const Studio = () => {
                     setStickers(slice);
                     setActiveTrashZone(null);
                     draggingStickerId.current = null;
+                    setDragDeleteState({ stickerId: null, isOutside: false, side: null, followPoint: null });
                   }}
                   onChange={(newAttrs) => {
                     const slice = stickers.slice();
@@ -759,27 +808,33 @@ const Studio = () => {
         <>
           <TrashZone
             side="left"
-            isVisible={isDraggingSticker}
+            isVisible={isDraggingSticker && dragDeleteState.isOutside}
             isActive={activeTrashZone === "left"}
             zoneRef={leftTrashRef}
+            followPoint={dragDeleteState.followPoint}
+            followEnabled={activeTrashZone === "left"}
           />
           <TrashZone
             side="right"
-            isVisible={isDraggingSticker}
+            isVisible={isDraggingSticker && dragDeleteState.isOutside}
             isActive={activeTrashZone === "right"}
             zoneRef={rightTrashRef}
+            followPoint={dragDeleteState.followPoint}
+            followEnabled={activeTrashZone === "right"}
           />
         </>
       )}
 
-      {/* Desktop Trash Zone - only on right side of photostrip */}
+      {/* Desktop Trash Zone - show closest side when outside photostrip */}
       {!isMobile && (
         <TrashZone
-          side="right"
-          isVisible={isDraggingSticker}
-          isActive={activeTrashZone === "right"}
+          side={dragDeleteState.isOutside ? (activeTrashZone || "right") : "right"}
+          isVisible={Boolean(selectedId) || isDraggingSticker}
+          isActive={Boolean(dragDeleteState.isOutside)}
           zoneRef={rightTrashRef}
           isDesktop={true}
+          followPoint={dragDeleteState.followPoint}
+          followEnabled={Boolean(dragDeleteState.isOutside)}
         />
       )}
 
